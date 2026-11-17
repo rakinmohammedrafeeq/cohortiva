@@ -52,8 +52,8 @@ Add these in Render dashboard under "Environment":
 | `SECRET_KEY` | (Generate a strong random string) | Use: `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"` |
 | `DEBUG` | `False` | **CRITICAL**: Must be False in production |
 | `DATABASE_URL` | (Your Neon connection string from Phase 1) | Paste the full PostgreSQL URL |
-| `ALLOWED_HOSTS` | `cohortiva-backend.onrender.com,cohortiva-frontend.vercel.app` | Update with your actual domains |
-| `FRONTEND_URL` | `https://cohortiva-frontend.vercel.app` | Update with your actual Vercel domain |
+| `ALLOWED_HOSTS` | `cohortiva-backend.onrender.com` | **Backend hostnames only** (comma-separated if multiple) |
+| `FRONTEND_URL` | `https://cohortiva-frontend.vercel.app` | Frontend origin for CORS (Django handles this separately from ALLOWED_HOSTS) |
 | `PYTHON_VERSION` | `3.11.0` | Or your preferred version |
 
 ### Step 3: Deploy
@@ -74,15 +74,9 @@ curl https://cohortiva-backend.onrender.com/api/
 
 ## Phase 3: Frontend Deployment (Vercel)
 
-### Step 1: Prepare Frontend
-Before deploying, update the API URL for production:
+### Step 1: Configure Environment Variables in Vercel
 
-Create `app/frontend/.env.production`:
-```env
-REACT_APP_API_URL=https://cohortiva-backend.onrender.com/api/
-```
-
-Commit this file to your repository.
+**Important:** Do not commit `.env.production` files. Configure the API URL through Vercel's dashboard instead.
 
 ### Step 2: Deploy to Vercel
 1. Go to https://vercel.com/dashboard
@@ -95,11 +89,13 @@ Commit this file to your repository.
    - **Output Directory**: `build`
 
 ### Step 3: Environment Variables
-Add in Vercel project settings:
+Add in Vercel project settings → Environment Variables:
 
-| Key | Value |
-|-----|-------|
-| `REACT_APP_API_URL` | `https://cohortiva-backend.onrender.com/api/` |
+| Key | Value | Notes |
+|-----|-------|-------|
+| `REACT_APP_API_URL` | `https://cohortiva-backend.onrender.com/api/` | Update with your actual Render backend URL |
+
+**Note:** Vercel automatically injects these variables during build. Never commit environment files with production URLs.
 
 ### Step 4: Deploy
 1. Click "Deploy"
@@ -110,12 +106,16 @@ Add in Vercel project settings:
 3. Wait for deployment (usually 1-2 minutes)
 4. Note your frontend URL: `https://cohortiva-frontend.vercel.app`
 
-### Step 5: Update Backend CORS
-Go back to Render and update these environment variables:
-- `ALLOWED_HOSTS`: Add your Vercel domain
-- `FRONTEND_URL`: Set to your Vercel URL
+### Step 5: Update Backend CORS Settings
+After frontend is deployed, go back to Render and verify these environment variables:
+- `ALLOWED_HOSTS`: Should contain **only backend hostnames** (e.g., `cohortiva-backend.onrender.com`)
+- `FRONTEND_URL`: Set to your Vercel URL (e.g., `https://cohortiva-frontend.vercel.app`)
 
-Redeploy the backend service in Render.
+**Note on CORS vs ALLOWED_HOSTS:**
+- `ALLOWED_HOSTS`: Django's Host header validation - backend hostnames only
+- `FRONTEND_URL`: Used for CORS configuration - frontend origin for cross-origin requests
+
+Redeploy the backend service in Render if you made changes.
 
 ## Phase 4: Post-Deployment Verification
 

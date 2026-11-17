@@ -79,3 +79,6 @@ tutoring-platform/
 
 # Agent workflow artifacts
 .agents/
+
+# AI-generated artifacts (local only)
+.local/

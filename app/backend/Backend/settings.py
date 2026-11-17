@@ -11,8 +11,25 @@ from datetime import timedelta
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-SECRET_KEY = os.getenv("SECRET_KEY") or "dev-secret-key-change-me"
+# Security: SECRET_KEY handling
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    if DEBUG:
+        # Development-only fallback - never used in production
+        SECRET_KEY = "dev-secret-key-change-me-INSECURE-FOR-DEVELOPMENT-ONLY"
+        import warnings
+        warnings.warn(
+            "Using insecure development SECRET_KEY. Set SECRET_KEY environment variable for production.",
+            RuntimeWarning
+        )
+    else:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured(
+            "SECRET_KEY environment variable is required when DEBUG=False. "
+            "Generate one with: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'"
+        )
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
 
