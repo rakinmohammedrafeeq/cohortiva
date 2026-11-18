@@ -59,14 +59,14 @@ export default function BookMeeting({ profile }) {
   const handleBook = async () => {
     if (!hasRequired) {
       if (isPastDate) {
-        setStatus("Không thể đặt lịch cho ngày đã qua.");
+        setStatus("Cannot book sessions for past dates.");
         return;
       }
       const missing = [];
-      if (!selectedTutor) missing.push("chọn tutor");
-      if (!date) missing.push("chọn ngày");
-      if (!slot) missing.push("chọn khung giờ");
-      setStatus(`Vui lòng ${missing.join(", ")} trước khi đặt lịch.`);
+      if (!selectedTutor) missing.push("select a coach");
+      if (!date) missing.push("select a date");
+      if (!slot) missing.push("select a time slot");
+      setStatus(`Please ${missing.join(", ")} before booking.`);
       return;
     }
     setSubmitting(true);

@@ -116,7 +116,7 @@ export default function Availability({ profile, roleName }) {
     }
   };
 
-  if (loading) return <div className="panel"><p>Đang tải...</p></div>;
+  if (loading) return <div className="panel"><p>Loading...</p></div>;
 
   // Non tutor view
   if (!isTutor) {
