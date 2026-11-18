@@ -10,6 +10,7 @@ const PUBLIC_ENDPOINTS = [
   "users/majors/",
   "users/roles/",
   "users/register/student/",
+  "users/apply-coach/",
 ];
 
 function isPublic(config) {
@@ -127,6 +128,11 @@ let rolesCache = null;
 
 const registerStudent = async (form) => {
   const res = await api.post(USERS_API + "register/student/", { ...form });
+  return res.data;
+};
+
+const applyCoach = async (form) => {
+  const res = await api.post(USERS_API + "apply-coach/", { ...form });
   return res.data;
 };
 
@@ -277,6 +283,7 @@ const getReportOverview = async (params = {}) => {
 
 export default {
   registerStudent,
+  applyCoach,
   login,
   verifyEmail,
   resendVerification,

@@ -18,7 +18,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 from .views import (
     ProfileViewSet, RegisterStudentAPIView, FacultyViewSet, 
-    MajorViewSet, RoleViewSet,
+    MajorViewSet, RoleViewSet, ApplyCoachAPIView, CoachApplicationViewSet,
     verify_email, resend_verification_email,
     password_reset_request, password_reset_validate, password_reset_confirm
 )
@@ -28,9 +28,11 @@ router.register(r'profiles', ProfileViewSet)
 router.register(r'faculties', FacultyViewSet, basename='faculties')
 router.register(r'majors', MajorViewSet, basename='majors')
 router.register(r'roles', RoleViewSet, basename='roles')
+router.register(r'coach-applications', CoachApplicationViewSet, basename='coach-applications')
 
 urlpatterns = list(router.urls) + [
     path('register/student/', RegisterStudentAPIView.as_view(), name='register-student'),
+    path('apply-coach/', ApplyCoachAPIView.as_view(), name='apply-coach'),
     # Email verification
     path('verify-email/', verify_email, name='verify-email'),
     path('resend-verification/', resend_verification_email, name='resend-verification'),

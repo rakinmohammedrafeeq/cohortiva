@@ -9,12 +9,14 @@ from django_ratelimit.decorators import ratelimit
 from django.contrib.auth.models import User
 from django.conf import settings
 from django.utils import timezone
+from django.db import transaction
 from datetime import timedelta
 
-from .models import Profile, Faculty, Major, Role
+from .models import Profile, Faculty, Major, Role, CoachApplication
 from .serializers import (
     ProfileSerializer, RegisterSerializer, FacultySerializer, 
     MajorSerializer, RoleSerializer,
+    CoachApplySerializer, CoachApplicationSerializer,
     PasswordResetRequestSerializer, PasswordResetValidateSerializer,
     PasswordResetConfirmSerializer
 )
@@ -45,7 +47,7 @@ class ProfileViewSet(viewsets.ModelViewSet):
 
         profile = getattr(request.user, "profile", None)
         if profile is None:
-            default_role = Role.objects.filter(name__iexact="admin").first()
+            default_role = Role.get_or_create_role('Student')
             profile, _ = Profile.objects.get_or_create(
                 user=request.user,
                 defaults={"role": default_role}
@@ -96,6 +98,122 @@ class RegisterStudentAPIView(APIView):
             response_data['message'] = 'Registration successful. Please check your email to verify your account.'
         
         return Response(response_data, status=status.HTTP_201_CREATED)
+
+
+def is_admin_user(user):
+    """Check if the user has administrative privileges."""
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_staff or user.is_superuser:
+        return True
+    profile = getattr(user, 'profile', None)
+    if profile and profile.role:
+        return profile.role.name.strip().lower() == 'admin'
+    return False
+
+
+class IsAdminUserRole(permissions.BasePermission):
+    """Permission class requiring admin role or staff/superuser status."""
+    def has_permission(self, request, view):
+        return is_admin_user(request.user)
+
+
+class ApplyCoachAPIView(APIView):
+    """Public endpoint to apply as a coach. Creates an account and pending application."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = CoachApplySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        application = serializer.save()
+        profile = application.user.profile
+
+        # Generate verification token and attempt to send email
+        token = profile.generate_verification_token()
+        email_sent = False
+
+        try:
+            email_sent = send_verification_email(profile.user, token)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to send verification email during coach application for {profile.user.email}: {e}")
+
+        response_data = {
+            'id': application.id,
+            'username': application.user.username,
+            'email': application.user.email,
+            'status': application.status,
+            'message': 'Coach application submitted successfully. Your application is pending administrator approval.',
+            'email_status': 'sent' if email_sent else 'pending',
+        }
+        return Response(response_data, status=status.HTTP_201_CREATED)
+
+
+class CoachApplicationViewSet(viewsets.ReadOnlyModelViewSet):
+    """Admin-only viewset to view, approve, and reject coach applications."""
+    queryset = CoachApplication.objects.select_related('user', 'reviewed_by').all().order_by('-created_at')
+    serializer_class = CoachApplicationSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdminUserRole]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['status']
+    search_fields = ['user__username', 'user__email', 'user__first_name', 'user__last_name', 'expertise']
+    ordering_fields = ['created_at', 'status']
+
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve(self, request, pk=None):
+        application = self.get_object()
+        if application.status == CoachApplication.STATUS_APPROVED:
+            return Response({'detail': 'Application is already approved.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Ensure Tutor role exists (concurrency-safe)
+        tutor_role = Role.get_or_create_role('Tutor')
+
+        with transaction.atomic():
+            application.status = CoachApplication.STATUS_APPROVED
+            application.reviewed_by = request.user
+            application.reviewed_at = timezone.now()
+            application.save()
+
+            # Elevate profile role to Tutor
+            profile = application.user.profile
+            profile.role = tutor_role
+            profile.save(update_fields=['role'])
+
+            # Create or update Tutor record in Tutoring app
+            from Tutoring.models import Tutor
+            Tutor.objects.update_or_create(
+                profile=profile,
+                defaults={
+                    'expertise': application.expertise,
+                    'bio': application.bio or '',
+                }
+            )
+
+        serializer = self.get_serializer(application)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject(self, request, pk=None):
+        application = self.get_object()
+        if application.status == CoachApplication.STATUS_REJECTED:
+            return Response({'detail': 'Application is already rejected.'}, status=status.HTTP_400_BAD_REQUEST)
+        if application.status == CoachApplication.STATUS_APPROVED:
+            return Response({'detail': 'Cannot reject an already approved application.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        rejection_reason = request.data.get('reason', '')
+
+        with transaction.atomic():
+            application.status = CoachApplication.STATUS_REJECTED
+            application.reviewed_by = request.user
+            application.reviewed_at = timezone.now()
+            application.rejection_reason = rejection_reason
+            application.save()
+
+        serializer = self.get_serializer(application)
+        return Response(serializer.data)
+
 
 
 class FacultyViewSet(viewsets.ReadOnlyModelViewSet):

@@ -8,7 +8,7 @@ from datetime import timedelta
 from unittest.mock import patch, MagicMock
 import time
 
-from .models import Profile, Role
+from .models import Profile, Role, Faculty, Major, CoachApplication
 from .utils.tokens import generate_password_reset_token, validate_password_reset_token
 
 
@@ -663,3 +663,537 @@ class PasswordValidationTests(TestCase):
         })
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
+class AcademicAPITests(TestCase):
+    """Test Faculty and Major API endpoints with empty and populated databases."""
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_faculty_list_empty(self):
+        """When database is empty, GET /api/users/faculties/ returns 200 with empty list."""
+        Faculty.objects.all().delete()
+        response = self.client.get('/api/users/faculties/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_faculty_list_populated(self):
+        """When database has faculties, returns them sorted by name."""
+        Faculty.objects.create(code='SCI', name='Faculty of Science')
+        Faculty.objects.create(code='ENG', name='Faculty of Engineering')
+
+        response = self.client.get('/api/users/faculties/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        # Should be sorted by name: Engineering before Science
+        self.assertEqual(response.data[0]['code'], 'ENG')
+        self.assertEqual(response.data[1]['code'], 'SCI')
+
+    def test_major_list_empty(self):
+        """When database is empty, GET /api/users/majors/ returns 200 with empty list."""
+        Major.objects.all().delete()
+        response = self.client.get('/api/users/majors/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_major_filtering_by_faculty(self):
+        """Filtering majors by ?faculty=<id> returns only majors for that faculty."""
+        fac1 = Faculty.objects.create(code='CS', name='Computer Science')
+        fac2 = Faculty.objects.create(code='MATH', name='Mathematics')
+
+        m1 = Major.objects.create(name='Software Engineering', faculty=fac1)
+        m2 = Major.objects.create(name='Data Science', faculty=fac1)
+        m3 = Major.objects.create(name='Pure Mathematics', faculty=fac2)
+
+        # All majors
+        response_all = self.client.get('/api/users/majors/')
+        self.assertEqual(len(response_all.data), 3)
+
+        # Filtered by faculty 1
+        response_f1 = self.client.get(f'/api/users/majors/?faculty={fac1.id}')
+        self.assertEqual(response_f1.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response_f1.data), 2)
+        major_names = [m['name'] for m in response_f1.data]
+        self.assertIn('Software Engineering', major_names)
+        self.assertIn('Data Science', major_names)
+        self.assertNotIn('Pure Mathematics', major_names)
+
+
+class LearnerRegistrationTests(TestCase):
+    """Test learner registration with and without academic data."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.student_role = Role.objects.create(name='Student')
+        self.tutor_role = Role.objects.create(name='Tutor')
+        self.admin_role = Role.objects.create(name='Admin')
+
+    def test_learner_registration_without_academic_data(self):
+        """Learner can register successfully with zero academic data provided."""
+        payload = {
+            'username': 'academicless_user',
+            'email': 'learner@example.com',
+            'password': 'StrongPassword123!',
+            'first_name': 'Jane',
+            'last_name': 'Learner',
+        }
+        response = self.client.post('/api/users/register/student/', payload)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        user = User.objects.get(username='academicless_user')
+        self.assertIsNone(user.profile.student_id)
+        self.assertIsNone(user.profile.faculty)
+        self.assertIsNone(user.profile.major)
+        self.assertEqual(user.profile.role, self.student_role)
+
+    def test_learner_registration_with_academic_data(self):
+        """Learner can register with valid faculty, major, and student_id."""
+        faculty = Faculty.objects.create(code='ENG', name='Faculty of Engineering')
+        major = Major.objects.create(name='Robotics', faculty=faculty)
+
+        payload = {
+            'username': 'engineering_student',
+            'email': 'eng@example.com',
+            'password': 'StrongPassword123!',
+            'first_name': 'Alex',
+            'last_name': 'Smith',
+            'student_id': 'ENG-2024-001',
+            'faculty': faculty.id,
+            'major': major.id,
+        }
+        response = self.client.post('/api/users/register/student/', payload)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        user = User.objects.get(username='engineering_student')
+        self.assertEqual(user.profile.student_id, 'ENG-2024-001')
+        self.assertEqual(user.profile.faculty, faculty)
+        self.assertEqual(user.profile.major, major)
+        self.assertEqual(user.profile.role, self.student_role)
+
+    def test_major_without_faculty_rejected(self):
+        """Submitting a major without a faculty is rejected."""
+        faculty = Faculty.objects.create(code='MED', name='Faculty of Medicine')
+        major = Major.objects.create(name='Anatomy', faculty=faculty)
+
+        payload = {
+            'username': 'orphan_major_user',
+            'email': 'med@example.com',
+            'password': 'StrongPassword123!',
+            'major': major.id,
+        }
+        response = self.client.post('/api/users/register/student/', payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('major', response.data)
+
+    def test_mismatched_faculty_and_major_rejected(self):
+        """Submitting a major that does not belong to the selected faculty is rejected."""
+        fac1 = Faculty.objects.create(code='ART', name='Faculty of Arts')
+        fac2 = Faculty.objects.create(code='SCI', name='Faculty of Science')
+        major_science = Major.objects.create(name='Astrophysics', faculty=fac2)
+
+        payload = {
+            'username': 'mismatched_user',
+            'email': 'mismatch@example.com',
+            'password': 'StrongPassword123!',
+            'faculty': fac1.id,
+            'major': major_science.id,
+        }
+        response = self.client.post('/api/users/register/student/', payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('major', response.data)
+
+
+class StudentIDValidationTests(TestCase):
+    """Test Student ID format, trimming, normalization, and uniqueness."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.student_role = Role.objects.create(name='Student')
+
+    def test_valid_alphanumeric_student_ids(self):
+        """Accepts various valid institutional ID formats and normalizes them."""
+        valid_ids = [
+            ('  stu-12345  ', 'STU-12345'),
+            ('1rn20cs001', '1RN20CS001'),
+            ('ABC_9988', 'ABC_9988'),
+            ('sid123456', 'SID123456'),
+        ]
+        for idx, (raw_id, expected_normalized) in enumerate(valid_ids):
+            response = self.client.post('/api/users/register/student/', {
+                'username': f'student_user_{idx}',
+                'email': f'student_{idx}@example.com',
+                'password': 'StrongPassword123!',
+                'student_id': raw_id,
+            })
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            user = User.objects.get(username=f'student_user_{idx}')
+            self.assertEqual(user.profile.student_id, expected_normalized)
+
+    def test_invalid_student_ids(self):
+        """Rejects student IDs that are too short, too long, or contain invalid characters."""
+        invalid_ids = [
+            'AB',                       # Too short (< 3 chars)
+            'A' * 31,                   # Too long (> 30 chars)
+            'STU@123',                  # Invalid character '@'
+            'ID 1234',                  # Internal whitespace
+            'ID#999',                   # Invalid character '#'
+        ]
+        for idx, sid in enumerate(invalid_ids):
+            response = self.client.post('/api/users/register/student/', {
+                'username': f'invalid_sid_user_{idx}',
+                'email': f'invalid_{idx}@example.com',
+                'password': 'StrongPassword123!',
+                'student_id': sid,
+            })
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertIn('student_id', response.data)
+
+    def test_duplicate_student_id_rejected(self):
+        """Rejects duplicate student IDs case-insensitively."""
+        # First registration
+        self.client.post('/api/users/register/student/', {
+            'username': 'first_student',
+            'email': 'first@example.com',
+            'password': 'StrongPassword123!',
+            'student_id': 'ID-2024-X',
+        })
+
+        # Second registration with same ID in different case
+        response = self.client.post('/api/users/register/student/', {
+            'username': 'second_student',
+            'email': 'second@example.com',
+            'password': 'StrongPassword123!',
+            'student_id': 'id-2024-x',
+        })
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('student_id', response.data)
+
+    def test_whitespace_only_student_id_stored_as_none(self):
+        """A whitespace-only student ID is normalized to None."""
+        response = self.client.post('/api/users/register/student/', {
+            'username': 'spaces_student',
+            'email': 'spaces@example.com',
+            'password': 'StrongPassword123!',
+            'student_id': '     ',
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(username='spaces_student')
+        self.assertIsNone(user.profile.student_id)
+
+
+class PrivilegeEscalationPreventionTests(TestCase):
+    """Test that public endpoints prevent elevation to Tutor or Admin roles."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.student_role = Role.objects.create(name='Student')
+        self.tutor_role = Role.objects.create(name='Tutor')
+        self.admin_role = Role.objects.create(name='Admin')
+
+    def test_role_injection_in_learner_registration_ignored(self):
+        """User cannot elevate privileges by passing role ID in registration body."""
+        for elevated_role in [self.tutor_role, self.admin_role]:
+            username = f'hack_{elevated_role.name.lower()}'
+            response = self.client.post('/api/users/register/student/', {
+                'username': username,
+                'email': f'{username}@example.com',
+                'password': 'StrongPassword123!',
+                'role': elevated_role.id,
+            })
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            user = User.objects.get(username=username)
+            # Must remain Student role
+            self.assertEqual(user.profile.role, self.student_role)
+
+    def test_missing_student_id_does_not_infer_tutor_role(self):
+        """Absence of student_id must NOT grant Tutor role."""
+        response = self.client.post('/api/users/register/student/', {
+            'username': 'nosid_user',
+            'email': 'nosid@example.com',
+            'password': 'StrongPassword123!',
+            # student_id omitted
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(username='nosid_user')
+        self.assertEqual(user.profile.role, self.student_role)
+        self.assertNotEqual(user.profile.role, self.tutor_role)
+
+    def test_admin_cannot_be_registered_publicly(self):
+        """There is no public registration endpoint for administrators."""
+        # Attempting to post to coach-applications viewset unauthenticated
+        response = self.client.get('/api/users/coach-applications/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class CoachApplicationFlowTests(TestCase):
+    """Test Coach application submission, approval, rejection, and role elevation."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.student_role = Role.objects.create(name='Student')
+        self.tutor_role = Role.objects.create(name='Tutor')
+        self.admin_role = Role.objects.create(name='Admin')
+
+        self.admin_user = User.objects.create_user(
+            username='superadmin',
+            email='admin@cohortiva.app',
+            password='AdminPassword123!',
+            is_staff=True,
+        )
+        Profile.objects.create(user=self.admin_user, role=self.admin_role)
+
+    def test_coach_application_submission(self):
+        """Public applicant can submit a coach application; does NOT receive Tutor role initially."""
+        payload = {
+            'username': 'coach_applicant_1',
+            'email': 'coach1@example.com',
+            'password': 'CoachPassword123!',
+            'first_name': 'Sarah',
+            'last_name': 'Connor',
+            'expertise': 'Algorithms, Data Structures',
+            'experience': '5 years teaching computer science at college level',
+            'qualifications': 'M.S. in Computer Science',
+            'bio': 'Passionate about problem solving.',
+        }
+        response = self.client.post('/api/users/apply-coach/', payload)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['status'], 'pending')
+
+        # Check database records
+        user = User.objects.get(username='coach_applicant_1')
+        app = CoachApplication.objects.get(user=user)
+        self.assertEqual(app.status, CoachApplication.STATUS_PENDING)
+        self.assertEqual(app.expertise, 'Algorithms, Data Structures')
+        # User profile does NOT have Tutor role
+        self.assertNotEqual(user.profile.role, self.tutor_role)
+
+    def test_coach_approval_elevates_role_and_creates_tutor(self):
+        """Admin approval changes status to approved, elevates profile role to Tutor, and creates Tutor record."""
+        # Submit application
+        self.client.post('/api/users/apply-coach/', {
+            'username': 'future_coach',
+            'email': 'future@example.com',
+            'password': 'CoachPassword123!',
+            'first_name': 'Alan',
+            'last_name': 'Turing',
+            'expertise': 'Cryptography, Computation',
+            'experience': 'Pioneer of computing',
+            'bio': 'Ready to coach learners.',
+        })
+
+        applicant = User.objects.get(username='future_coach')
+        app = CoachApplication.objects.get(user=applicant)
+
+        # Authenticate as admin
+        self.client.force_authenticate(user=self.admin_user)
+
+        # Approve application
+        response = self.client.post(f'/api/users/coach-applications/{app.id}/approve/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'approved')
+
+        # Verify applicant profile role is now Tutor
+        applicant.profile.refresh_from_db()
+        self.assertEqual(applicant.profile.role, self.tutor_role)
+
+        # Verify Tutor model instance in Tutoring app
+        from Tutoring.models import Tutor
+        tutor_record = Tutor.objects.get(profile=applicant.profile)
+        self.assertEqual(tutor_record.expertise, 'Cryptography, Computation')
+        self.assertEqual(tutor_record.bio, 'Ready to coach learners.')
+
+    def test_coach_rejection_leaves_applicant_unprivileged(self):
+        """Admin rejection marks application as rejected and leaves user role unprivileged."""
+        self.client.post('/api/users/apply-coach/', {
+            'username': 'rejected_applicant',
+            'email': 'rejected@example.com',
+            'password': 'CoachPassword123!',
+            'expertise': 'None',
+            'experience': 'None',
+        })
+        applicant = User.objects.get(username='rejected_applicant')
+        app = CoachApplication.objects.get(user=applicant)
+
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.post(
+            f'/api/users/coach-applications/{app.id}/reject/',
+            {'reason': 'Insufficient experience.'}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'rejected')
+
+        app.refresh_from_db()
+        self.assertEqual(app.rejection_reason, 'Insufficient experience.')
+        applicant.profile.refresh_from_db()
+        self.assertNotEqual(applicant.profile.role, self.tutor_role)
+
+    def test_non_admin_cannot_approve_coach(self):
+        """Regular learners cannot approve coach applications."""
+        learner_user = User.objects.create_user(
+            username='simple_learner',
+            email='learner@example.com',
+            password='Password123!'
+        )
+        Profile.objects.create(user=learner_user, role=self.student_role)
+
+        # Create pending application
+        applicant = User.objects.create_user(
+            username='app_user', email='app@example.com', password='Password123!'
+        )
+        Profile.objects.create(user=applicant, role=self.student_role)
+        app = CoachApplication.objects.create(
+            user=applicant, expertise='Math', experience='3 years'
+        )
+
+        # Try approving as regular learner
+        self.client.force_authenticate(user=learner_user)
+        response = self.client.post(f'/api/users/coach-applications/{app.id}/approve/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unauthenticated_and_regular_user_access_blocked_on_all_actions(self):
+        """Verify list, retrieve, approve, and reject cannot expose applicant information to non-admins."""
+        applicant = User.objects.create_user(
+            username='secret_applicant', email='secret@example.com', password='Password123!'
+        )
+        Profile.objects.create(user=applicant, role=self.student_role)
+        app = CoachApplication.objects.create(
+            user=applicant, expertise='Secret Expertise', experience='Confidential Experience'
+        )
+
+        learner_user = User.objects.create_user(
+            username='ordinary_learner', email='ordinary@example.com', password='Password123!'
+        )
+        Profile.objects.create(user=learner_user, role=self.student_role)
+
+        # 1. Unauthenticated checks (401)
+        self.client.logout()
+        self.assertEqual(self.client.get('/api/users/coach-applications/').status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(self.client.get(f'/api/users/coach-applications/{app.id}/').status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(self.client.post(f'/api/users/coach-applications/{app.id}/approve/').status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(self.client.post(f'/api/users/coach-applications/{app.id}/reject/').status_code, status.HTTP_401_UNAUTHORIZED)
+
+        # 2. Regular learner checks (403) - applicant info never exposed
+        self.client.force_authenticate(user=learner_user)
+        resp_list = self.client.get('/api/users/coach-applications/')
+        self.assertEqual(resp_list.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertNotIn('secret_applicant', str(resp_list.content))
+
+        resp_detail = self.client.get(f'/api/users/coach-applications/{app.id}/')
+        self.assertEqual(resp_detail.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertNotIn('Confidential Experience', str(resp_detail.content))
+
+        self.assertEqual(self.client.post(f'/api/users/coach-applications/{app.id}/approve/').status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.client.post(f'/api/users/coach-applications/{app.id}/reject/').status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_repeated_approval_and_rejection_attempts(self):
+        """Verify duplicate approval/rejection handling and state transition consistency."""
+        applicant = User.objects.create_user(
+            username='repeat_app_user', email='repeat@example.com', password='Password123!'
+        )
+        Profile.objects.create(user=applicant, role=self.student_role)
+        app = CoachApplication.objects.create(
+            user=applicant, expertise='Physics', experience='4 years'
+        )
+
+        self.client.force_authenticate(user=self.admin_user)
+
+        # Initial approve
+        resp1 = self.client.post(f'/api/users/coach-applications/{app.id}/approve/')
+        self.assertEqual(resp1.status_code, status.HTTP_200_OK)
+
+        # Repeated approve attempt on already approved application
+        resp2 = self.client.post(f'/api/users/coach-applications/{app.id}/approve/')
+        self.assertEqual(resp2.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp2.data['detail'], 'Application is already approved.')
+
+        # Attempting to reject an already approved application
+        resp_reject = self.client.post(f'/api/users/coach-applications/{app.id}/reject/')
+        self.assertEqual(resp_reject.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp_reject.data['detail'], 'Cannot reject an already approved application.')
+
+        # Create another application to test repeated rejection
+        applicant2 = User.objects.create_user(
+            username='reject_app_user', email='reject2@example.com', password='Password123!'
+        )
+        Profile.objects.create(user=applicant2, role=self.student_role)
+        app2 = CoachApplication.objects.create(
+            user=applicant2, expertise='Chemistry', experience='1 year'
+        )
+
+        resp_rej1 = self.client.post(f'/api/users/coach-applications/{app2.id}/reject/')
+        self.assertEqual(resp_rej1.status_code, status.HTTP_200_OK)
+
+        # Repeated reject attempt on already rejected application
+        resp_rej2 = self.client.post(f'/api/users/coach-applications/{app2.id}/reject/')
+        self.assertEqual(resp_rej2.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp_rej2.data['detail'], 'Application is already rejected.')
+
+    def test_duplicate_coach_application_submission_rejected(self):
+        """Applicant cannot submit duplicate application with existing username or email."""
+        payload = {
+            'username': 'first_time_coach',
+            'email': 'ftc@example.com',
+            'password': 'Password123!',
+            'expertise': 'Biology',
+            'experience': '3 years coaching',
+        }
+        res1 = self.client.post('/api/users/apply-coach/', payload)
+        self.assertEqual(res1.status_code, status.HTTP_201_CREATED)
+
+        # Duplicate username
+        res_dup_user = self.client.post('/api/users/apply-coach/', {
+            'username': 'first_time_coach',
+            'email': 'ftc_diff@example.com',
+            'password': 'Password123!',
+            'expertise': 'Biology',
+            'experience': '3 years',
+        })
+        self.assertEqual(res_dup_user.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('username', res_dup_user.data)
+
+        # Duplicate email
+        res_dup_email = self.client.post('/api/users/apply-coach/', {
+            'username': 'different_username_coach',
+            'email': 'ftc@example.com',
+            'password': 'Password123!',
+            'expertise': 'Biology',
+            'experience': '3 years',
+        })
+        self.assertEqual(res_dup_email.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('email', res_dup_email.data)
+
+
+class ReferenceDataManagementCommandTests(TestCase):
+    """Test seed_reference_data management command."""
+
+    def test_idempotent_role_seeding(self):
+        """Command safely creates default roles without duplicating."""
+        from django.core.management import call_command
+        from io import StringIO
+
+        out = StringIO()
+        call_command('seed_reference_data', stdout=out)
+        self.assertIn('Reference Data Seeding Summary', out.getvalue())
+
+        # Verify roles exist
+        self.assertTrue(Role.objects.filter(name='Student').exists())
+        self.assertTrue(Role.objects.filter(name='Tutor').exists())
+        self.assertTrue(Role.objects.filter(name='Admin').exists())
+
+        # Calling a second time produces 0 new roles
+        out2 = StringIO()
+        call_command('seed_reference_data', stdout=out2)
+        self.assertIn('0 created', out2.getvalue())
+
+    def test_dry_run_does_not_commit(self):
+        """Dry run does not commit new records."""
+        from django.core.management import call_command
+        from io import StringIO
+        Role.objects.all().delete()
+
+        out = StringIO()
+        call_command('seed_reference_data', '--dry-run', stdout=out)
+        self.assertIn('[DRY-RUN]', out.getvalue())
+        # Roles should still be empty because changes were rolled back
+        self.assertEqual(Role.objects.count(), 0)

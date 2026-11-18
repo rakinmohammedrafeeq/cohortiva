@@ -26,4 +26,4 @@ RUN python manage.py collectstatic --noinput
 EXPOSE 8000
 
 # Run migrations and start server at RUNTIME (not build time)
-CMD python manage.py migrate && python load_fixtures.py && gunicorn Backend.wsgi:application --bind 0.0.0.0:$PORT
+CMD python manage.py migrate && gunicorn Backend.wsgi:application --bind 0.0.0.0:$PORT

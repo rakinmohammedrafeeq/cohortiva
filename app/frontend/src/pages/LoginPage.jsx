@@ -94,7 +94,7 @@ export default function LoginPage() {
       </form>
 
       <p className="auth-link">
-        Don't have an account? <Link to="/register">Register</Link>
+        Don't have an account? <Link to="/register">Create a learner account</Link> or <Link to="/apply-coach">Apply as a coach</Link>
       </p>
     </div>
   );

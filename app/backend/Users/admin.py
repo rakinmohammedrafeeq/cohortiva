@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Role, Profile, Faculty, Major
+from .models import Role, Profile, Faculty, Major, CoachApplication
 
 
 @admin.register(Role)
@@ -26,3 +26,10 @@ class MajorAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "faculty")
     search_fields = ("name",)
     list_filter = ("faculty",)
+
+
+@admin.register(CoachApplication)
+class CoachApplicationAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "status", "reviewed_by", "reviewed_at", "created_at")
+    search_fields = ("user__username", "user__email", "expertise")
+    list_filter = ("status", "created_at")
