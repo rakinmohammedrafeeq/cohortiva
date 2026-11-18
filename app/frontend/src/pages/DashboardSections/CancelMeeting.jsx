@@ -138,7 +138,7 @@ export default function CancelMeeting({ profile, roleName }) {
                 </div>
                 <div className="session-meta">
                   <span>Learner: {s.student_name || s.student_username || s.student}</span>
-                  <span>Coach: {s.tutor}</span>
+                  <span>Coach: {s.tutor_name || s.tutor_username || `Coach #${s.tutor}`}</span>
                   <span>Mode: {s.mode}</span>
                   {s.location && <span>Location: {s.location}</span>}
                   <span>Status: {statusLabel(s.status)}</span>
@@ -178,7 +178,7 @@ export default function CancelMeeting({ profile, roleName }) {
                 </div>
                 <div className="session-meta">
                   <span>Learner: {s.student_name || s.student_username || s.student}</span>
-                  <span>Coach: {s.tutor}</span>
+                  <span>Coach: {s.tutor_name || s.tutor_username || `Coach #${s.tutor}`}</span>
                   <span>Mode: {s.mode}</span>
                   {s.location && <span>Location: {s.location}</span>}
                   <span>Status: {statusLabel(s.status)}</span>
@@ -210,7 +210,7 @@ export default function CancelMeeting({ profile, roleName }) {
                 </div>
                 <div className="session-meta">
                   <span>Learner: {s.student_name || s.student_username || s.student}</span>
-                  <span>Coach: {s.tutor}</span>
+                  <span>Coach: {s.tutor_name || s.tutor_username || `Coach #${s.tutor}`}</span>
                   <span>Mode: {s.mode}</span>
                   {s.location && <span>Location: {s.location}</span>}
                   <span>Status: {statusLabel(s.status)}</span>

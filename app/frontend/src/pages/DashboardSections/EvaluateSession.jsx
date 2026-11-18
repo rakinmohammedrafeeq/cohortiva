@@ -234,7 +234,7 @@ export default function EvaluateSession({ profile, roleName }) {
                 <span className="ev-mode">{s.mode}</span>
               </div>
               <div className="evaluate-meta">
-                <span>Coach: {s.tutor}</span>
+                <span>Coach: {s.tutor_name || s.tutor_username || `Coach #${s.tutor}`}</span>
                 {s.location && <span>Location: {s.location}</span>}
               </div>
               {canEdit ? (
