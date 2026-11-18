@@ -11,9 +11,25 @@ class StudentSerializer(serializers.ModelSerializer):
 class TutorSerializer(serializers.ModelSerializer):
     # Không cho client tự set profile, sẽ tự gán từ user đang đăng nhập
     profile = serializers.PrimaryKeyRelatedField(read_only=True)
+    name = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    
     class Meta:
         model = Tutor
-        fields = ['id', 'profile', 'expertise', 'availability', 'bio']
+        fields = ['id', 'profile', 'name', 'email', 'expertise', 'availability', 'bio']
+    
+    def get_name(self, obj):
+        """Return full name or username as fallback"""
+        user = getattr(obj.profile, "user", None)
+        if not user:
+            return None
+        full_name = user.get_full_name().strip()
+        return full_name or user.username
+    
+    def get_email(self, obj):
+        """Return user email"""
+        user = getattr(obj.profile, "user", None)
+        return getattr(user, "email", None)
 
 class SessionSerializer(serializers.ModelSerializer):
     reason = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)

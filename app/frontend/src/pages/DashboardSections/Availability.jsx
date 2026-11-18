@@ -126,11 +126,12 @@ export default function Availability({ profile, roleName }) {
         {tutorsList.length === 0 && <p className="empty-info">No coaches available.</p>}
         <div className="readonly-tutor-list">
           {tutorsList.map((t) => {
-            const headerName = typeof t.profile === "number" ? `Coach #${t.id}` : (t.profile || `Coach #${t.id}`);
+            const headerName = t.name || `Coach #${t.id}`;
             return (
               <div key={t.id} className="readonly-tutor-card">
                 <h3>{headerName}</h3>
                 <p className="small-note">Expertise: {t.expertise || "—"}</p>
+                {t.bio && <p className="small-note">Bio: {t.bio}</p>}
                 {t.availability ? (
                   Object.entries(t.availability).map(([d, slots]) => (
                     <div key={d} style={{ marginTop: ".35rem" }}>

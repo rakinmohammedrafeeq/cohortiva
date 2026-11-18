@@ -141,7 +141,7 @@ export default function BookMeeting({ profile }) {
           >
             <option value="">-- Select Coach --</option>
             {tutors.map(t => {
-              const label = typeof t.profile === "number" ? `Coach #${t.id}` : (t.profile || `Coach #${t.id}`);
+              const label = t.name || t.username || `Coach #${t.id}`;
               return (
                 <option key={t.id} value={t.id}>
                   {label}
@@ -150,6 +150,30 @@ export default function BookMeeting({ profile }) {
             })}
           </select>
         </label>
+
+        {selectedTutorObj && (
+          <div className="coach-details" style={{ 
+            marginTop: ".5rem", 
+            padding: ".8rem", 
+            background: "var(--panel-bg, #f9f9f9)", 
+            borderRadius: "4px",
+            fontSize: ".9rem"
+          }}>
+            <h4 style={{ marginTop: 0, marginBottom: ".5rem", fontSize: "1rem" }}>
+              {selectedTutorObj.name || `Coach #${selectedTutorObj.id}`}
+            </h4>
+            {selectedTutorObj.expertise && (
+              <p style={{ margin: ".3rem 0" }}>
+                <strong>Expertise:</strong> {selectedTutorObj.expertise}
+              </p>
+            )}
+            {selectedTutorObj.bio && (
+              <p style={{ margin: ".3rem 0" }}>
+                <strong>Bio:</strong> {selectedTutorObj.bio}
+              </p>
+            )}
+          </div>
+        )}
 
         <label>
           Date
