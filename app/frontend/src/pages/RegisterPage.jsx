@@ -349,7 +349,7 @@ export default function RegisterPage({ initialRole }) {
   };
 
   return (
-    <div className="auth-container" style={{ maxWidth: accountType === "coach" ? "580px" : "480px" }}>
+    <div className="auth-container fade-in" style={{ maxWidth: accountType === "coach" ? "580px" : "480px" }}>
       {/* Account Type Selector */}
       <div className="account-type-selector" role="tablist" aria-label="Account Type Selection">
         <button
@@ -791,7 +791,11 @@ export default function RegisterPage({ initialRole }) {
 
       {/* Footer navigation */}
       <p className="auth-link" style={{ marginTop: "1.5rem" }}>
-        Already have an account? <Link to="/">Login</Link>
+        Already have an account? <Link to="/login">Login</Link>
+      </p>
+      
+      <p className="auth-link" style={{ marginTop: "0.75rem" }}>
+        <Link to="/">← Back to Home</Link>
       </p>
     </div>
   );

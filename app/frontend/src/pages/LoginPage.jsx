@@ -50,8 +50,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="auth-container">
+    <div className="auth-container fade-in">
       <h2 className="auth-title">Welcome Back</h2>
+      <p className="auth-subtitle">Sign in to continue your learning journey</p>
 
       {!emailVerified && (
         <Alert type="warning">
@@ -95,6 +96,10 @@ export default function LoginPage() {
 
       <p className="auth-link">
         Don't have an account? <Link to="/register">Create a learner account</Link> or <Link to="/apply-coach">Apply as a coach</Link>
+      </p>
+      
+      <p className="auth-link" style={{ marginTop: "0.75rem" }}>
+        <Link to="/">← Back to Home</Link>
       </p>
     </div>
   );
