@@ -122,7 +122,13 @@ export default function Dashboard() {
   const renderSection = () => {
     switch (currentSection) {
       case 'availability': return <Availability profile={profile} roleName={roleName} />;
-      case 'book': return <BookMeeting profile={profile} />;
+      case 'book': 
+        // Coaches (tutors) cannot access Book Session
+        if (roleLower === 'tutor') {
+          navigate('/dashboard/availability', { replace: true });
+          return null;
+        }
+        return <BookMeeting profile={profile} />;
       case 'schedule': return <CancelMeeting profile={profile} roleName={roleName} />;
       case 'cancel': return <CancelMeeting profile={profile} roleName={roleName} />;
       case 'evaluate': return <EvaluateSession profile={profile} roleName={roleName} />;
