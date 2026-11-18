@@ -40,7 +40,7 @@ export default function EvaluateSession({ profile, roleName }) {
     setLoading(true);
     authService.getSessions()
       .then(data => setSessions(Array.isArray(data) ? data : []))
-      .catch(() => setError("Không tải được danh sách phiên."))
+      .catch(() => setError("Failed to load sessions."))
       .finally(() => setLoading(false));
   }, [canView]);
 
@@ -93,16 +93,16 @@ export default function EvaluateSession({ profile, roleName }) {
 
       if (field === "comment") {
         if (value.length > 200) {
-          nextMsg = "Nhận xét tối đa 200 ký tự.";
+          nextMsg = "Comment must be 200 characters or less.";
           nextType = "error";
           nextValue = value.slice(0, 200);
-        } else if (nextType === "error" && nextMsg === "Nhận xét tối đa 200 ký tự.") {
+        } else if (nextType === "error" && nextMsg === "Comment must be 200 characters or less.") {
           nextMsg = "";
           nextType = "";
         }
       }
 
-      if (field === "rating" && nextType === "error" && nextMsg === "Vui lòng chọn rating (1-5) trước khi gửi.") {
+      if (field === "rating" && nextType === "error" && nextMsg === "Please select a rating (1-5) before submitting.") {
         nextMsg = "";
         nextType = "";
       }
@@ -127,7 +127,7 @@ export default function EvaluateSession({ profile, roleName }) {
     if (!fb.rating) {
       setFeedbackMap((m) => ({
         ...m,
-        [sessionId]: { ...fb, message: "Vui lòng chọn rating (1-5) trước khi gửi.", messageType: "error" }
+        [sessionId]: { ...fb, message: "Please select a rating (1-5) before submitting.", messageType: "error" }
       }));
       return;
     }
@@ -136,7 +136,7 @@ export default function EvaluateSession({ profile, roleName }) {
     if (!Number.isFinite(ratingValue) || ratingValue < 1 || ratingValue > 5) {
       setFeedbackMap((m) => ({
         ...m,
-        [sessionId]: { ...fb, message: "Rating phải trong khoảng 1-5.", messageType: "error" }
+        [sessionId]: { ...fb, message: "Rating must be between 1 and 5.", messageType: "error" }
       }));
       return;
     }
@@ -144,7 +144,7 @@ export default function EvaluateSession({ profile, roleName }) {
     if ((fb.comment || "").length > 200) {
       setFeedbackMap((m) => ({
         ...m,
-        [sessionId]: { ...fb, message: "Nhận xét tối đa 200 ký tự.", messageType: "error" }
+        [sessionId]: { ...fb, message: "Comment must be 200 characters or less.", messageType: "error" }
       }));
       return;
     }
@@ -162,7 +162,7 @@ export default function EvaluateSession({ profile, roleName }) {
             id: updated.id,
             rating: updated.rating || "",
             comment: updated.comment || "",
-            message: "Đã cập nhật.",
+            message: "Updated successfully.",
             messageType: "success"
           }
         }));
@@ -178,7 +178,7 @@ export default function EvaluateSession({ profile, roleName }) {
             id: created.id,
             rating: created.rating || "",
             comment: created.comment || "",
-            message: "Đã lưu.",
+            message: "Saved successfully.",
             messageType: "success"
           }
         }));
@@ -186,7 +186,7 @@ export default function EvaluateSession({ profile, roleName }) {
     } catch {
       setFeedbackMap((m) => ({
         ...m,
-        [sessionId]: { ...fb, message: "Lưu thất bại.", messageType: "error" }
+        [sessionId]: { ...fb, message: "Failed to save.", messageType: "error" }
       }));
     } finally {
       setSavingId(null);
@@ -194,7 +194,7 @@ export default function EvaluateSession({ profile, roleName }) {
   };
 
   const fmt = dt => {
-    try { return new Date(dt).toLocaleString("vi-VN", { hour12: false }); }
+    try { return new Date(dt).toLocaleString("en-US", { hour12: false }); }
     catch { return dt; }
   };
 

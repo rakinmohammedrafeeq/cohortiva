@@ -126,8 +126,8 @@ export default function Dashboard() {
       case 'schedule': return <CancelMeeting profile={profile} roleName={roleName} />;
       case 'cancel': return <CancelMeeting profile={profile} roleName={roleName} />;
       case 'evaluate': return <EvaluateSession profile={profile} roleName={roleName} />;
-      case 'report': return roleLower === 'admin' ? <GenerateReport profile={profile} /> : <div className="panel"><p>Không có quyền.</p></div>;
-      default: return <div className="panel"><p>Chọn một mục ở thanh điều hướng.</p></div>;
+      case 'report': return roleLower === 'admin' ? <GenerateReport profile={profile} /> : <div className="panel"><p>Access denied.</p></div>;
+      default: return <div className="panel"><p>Select an item from the navigation bar.</p></div>;
     }
   };
 
@@ -182,7 +182,7 @@ export default function Dashboard() {
             roleLower === 'student' ? <StudentDashboard profile={profile}/> :
             roleLower === 'tutor' ? <TutorDashboard profile={profile}/> :
             roleLower === 'admin' ? <AdminDashboard profile={profile}/> :
-            <div className="panel"><p>Không xác định vai trò.</p></div>
+            <div className="panel"><p>Role undefined.</p></div>
           )}
         </div>
       </div>

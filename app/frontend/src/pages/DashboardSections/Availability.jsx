@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import authService from "../../services/authService";
 
 const DAYS = [
-  { key: "monday", label: "Thứ 2" },
-  { key: "tuesday", label: "Thứ 3" },
-  { key: "wednesday", label: "Thứ 4" },
-  { key: "thursday", label: "Thứ 5" },
-  { key: "friday", label: "Thứ 6" },
-  { key: "saturday", label: "Thứ 7" },
-  { key: "sunday", label: "CN" },
+  { key: "monday", label: "Monday" },
+  { key: "tuesday", label: "Tuesday" },
+  { key: "wednesday", label: "Wednesday" },
+  { key: "thursday", label: "Thursday" },
+  { key: "friday", label: "Friday" },
+  { key: "saturday", label: "Saturday" },
+  { key: "sunday", label: "Sunday" },
 ];
 
 export default function Availability({ profile, roleName }) {
@@ -34,7 +34,7 @@ export default function Availability({ profile, roleName }) {
           setTutor(data);
           setAvailability(data?.availability || {});
         })
-        .catch(() => setError("Không tải được dữ liệu tutor."))
+        .catch(() => setError("Failed to load coach data."))
         .finally(() => setLoading(false));
     } else {
       authService
@@ -59,13 +59,13 @@ export default function Availability({ profile, roleName }) {
   const addSlot = () => {
     if (!start || !end) return;
     if (end <= start) {
-      setError("Giờ kết thúc phải sau giờ bắt đầu.");
+      setError("End time must be after start time.");
       return;
     }
     const newSlot = `${start}-${end}`;
     const existing = availability[day] || [];
     if (existing.some((slot) => overlaps(slot, newSlot))) {
-      setError("Slot bị trùng hoặc chồng lấp với slot hiện có, hãy chọn khung giờ khác.");
+      setError("Time slot overlaps with an existing slot.");
       return;
     }
     setError("");
@@ -96,7 +96,7 @@ export default function Availability({ profile, roleName }) {
       setTutor(updated);
       setAvailability(updated.availability || {});
     } catch (e) {
-      setError("Lưu không thành công.");
+      setError("Failed to save.");
     } finally {
       setSaving(false);
     }
@@ -110,7 +110,7 @@ export default function Availability({ profile, roleName }) {
       setTutor(updated);
       setAvailability(updated.availability || {});
     } catch {
-      setError("Không tạo được dữ liệu mẫu.");
+      setError("Failed to generate sample data.");
     } finally {
       setSaving(false);
     }

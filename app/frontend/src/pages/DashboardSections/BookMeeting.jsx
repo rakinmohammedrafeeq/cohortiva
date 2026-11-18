@@ -85,7 +85,7 @@ export default function BookMeeting({ profile }) {
         location: mode === "offline" ? location || null : null
       };
       await authService.createSession(payload);
-      setStatus("Đặt lịch thành công.");
+      setStatus("Session booked successfully.");
       setTutors(prev =>
         prev.map(t => {
           if (String(t.id) !== String(selectedTutor) || !t.availability) return t;
@@ -111,7 +111,7 @@ export default function BookMeeting({ profile }) {
         else if (Array.isArray(resp.non_field_errors)) msg = resp.non_field_errors.join(" ");
         else if (resp.non_field_errors) msg = String(resp.non_field_errors);
       }
-      setStatus(msg || "Đặt lịch thất bại.");
+      setStatus(msg || "Failed to book session.");
     } finally {
       setSubmitting(false);
     }
@@ -124,7 +124,7 @@ export default function BookMeeting({ profile }) {
         Select a coach, date, and an available time slot from the coach's availability.
       </p>
       {status && (
-        <p className={`auth-message ${status.includes("thành công") ? "success" : "error"}`}>
+        <p className={`auth-message ${status.includes("successfully") ? "success" : "error"}`}>
           {status}
         </p>
       )}

@@ -37,7 +37,7 @@ export default function CancelMeeting({ profile, roleName }) {
     setError("");
     authService.getSessions()
       .then(data => setSessions(Array.isArray(data) ? data : []))
-      .catch(() => setError("Không tải được danh sách phiên."))
+      .catch(() => setError("Failed to load sessions."))
       .finally(() => setLoading(false));
   }, []);
 
@@ -57,10 +57,10 @@ export default function CancelMeeting({ profile, roleName }) {
   const now = new Date();
   const statusLabel = (status) => {
     switch ((status || "").toLowerCase()) {
-      case "scheduled": return "Đã lên lịch";
-      case "ongoing": return "Đang diễn ra";
-      case "completed": return "Đã hoàn thành";
-      case "cancelled": return "Đã hủy";
+      case "scheduled": return "Scheduled";
+      case "ongoing": return "Ongoing";
+      case "completed": return "Completed";
+      case "cancelled": return "Cancelled";
       default: return status || "—";
     }
   };
@@ -78,7 +78,7 @@ export default function CancelMeeting({ profile, roleName }) {
     .sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
 
   const fmt = (dt) => {
-    try { return new Date(dt).toLocaleString("vi-VN", { hour12: false }); }
+    try { return new Date(dt).toLocaleString("en-US", { hour12: false }); }
     catch { return dt; }
   };
 
@@ -86,7 +86,7 @@ export default function CancelMeeting({ profile, roleName }) {
     const reasonRaw = reasons[id];
     const trimmed = typeof reasonRaw === "string" ? reasonRaw.trim() : "";
     if (!isAdmin && !trimmed) {
-      setMessage("Vui lòng nhập lý do hủy lịch.");
+      setMessage("Please enter a cancellation reason.");
       return;
     }
     setCancelingId(id);
@@ -95,15 +95,15 @@ export default function CancelMeeting({ profile, roleName }) {
       if (isAdmin) {
         await authService.deleteSession(id);
         setSessions(prev => prev.filter(s => s.id !== id));
-        setMessage("Xóa lịch thành công.");
+        setMessage("Session deleted successfully.");
       } else {
         await authService.cancelSession(id, trimmed);
         setSessions(prev => prev.map(s => s.id === id ? { ...s, status: "cancelled" } : s));
-        setMessage("Hủy lịch thành công.");
+        setMessage("Session cancelled successfully.");
         setReasons(prev => ({ ...prev, [id]: "" }));
       }
     } catch {
-      setMessage(isAdmin ? "Xóa lịch thất bại." : "Hủy lịch thất bại.");
+      setMessage(isAdmin ? "Failed to delete session." : "Failed to cancel session.");
     } finally {
       setCancelingId(null);
     }
@@ -118,7 +118,7 @@ export default function CancelMeeting({ profile, roleName }) {
         {isAdmin ? "Admins can delete any session directly (including past sessions)." : "View and cancel booked sessions (cancellation reason required)."}
       </p>
       {message && (
-        <p className={`auth-message ${message.includes("thành công") ? "success" : "error"}`}>
+        <p className={`auth-message ${message.includes("successfully") ? "success" : "error"}`}>
           {message}
         </p>
       )}

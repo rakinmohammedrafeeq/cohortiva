@@ -17,7 +17,7 @@ export default function GenerateReport({ profile }) {
       const data = await authService.getReportOverview({ from, to });
       setOverview(data || {});
     } catch {
-      setError("Không lấy được báo cáo.");
+      setError("Failed to load report.");
     } finally {
       setLoading(false);
     }
@@ -28,8 +28,8 @@ export default function GenerateReport({ profile }) {
   if (!isAdmin) {
     return (
       <div className="panel">
-        <h3 className="section-title">Báo cáo</h3>
-        <p className="empty-info">Chỉ admin mới xem được báo cáo tổng hợp.</p>
+        <h3 className="section-title">Reports</h3>
+        <p className="empty-info">Only admins can view comprehensive reports.</p>
       </div>
     );
   }
@@ -46,11 +46,11 @@ export default function GenerateReport({ profile }) {
 
   return (
     <div className="panel report-panel">
-      <h3 className="section-title">Báo cáo hệ thống</h3>
-      <p className="small-note">Thống kê hỗ trợ ra quyết định (attendance & feedback).</p>
+      <h3 className="section-title">System Reports</h3>
+      <p className="small-note">Analytics to support decision-making (attendance & feedback).</p>
       <div className="report-filters">
         <label>
-          Từ ngày
+          From Date
           <input
             type="date"
             className="inline-input"
@@ -59,7 +59,7 @@ export default function GenerateReport({ profile }) {
           />
         </label>
         <label>
-          Đến ngày
+          To Date
           <input
             type="date"
             className="inline-input"
@@ -78,29 +78,29 @@ export default function GenerateReport({ profile }) {
           }}
           style={{ maxWidth: "160px" }}
         >
-          {refreshing ? "Đang tải..." : "Làm mới"}
+          {refreshing ? "Loading..." : "Refresh"}
         </button>
       </div>
 
       {error && <p className="auth-message error">{error}</p>}
-      {loading && <p>Đang tải báo cáo...</p>}
+      {loading && <p>Loading report...</p>}
       {!loading && !error && (
         <div className="report-grid">
           <div className="report-card">
-            <h4>Phiên học</h4>
+            <h4>Sessions</h4>
             <ul className="stat-list">
-              <li>Tổng: {total}</li>
-              <li>Hoàn thành: {completed}</li>
-              <li>Đã hủy: {sessions.cancelled || 0}</li>
-              <li>Đang chờ: {sessions.scheduled || 0}</li>
-              <li>Tỷ lệ hoàn thành: {completionRate}%</li>
+              <li>Total: {total}</li>
+              <li>Completed: {completed}</li>
+              <li>Cancelled: {sessions.cancelled || 0}</li>
+              <li>Scheduled: {sessions.scheduled || 0}</li>
+              <li>Completion Rate: {completionRate}%</li>
             </ul>
           </div>
           <div className="report-card">
             <h4>Feedback</h4>
             <ul className="stat-list">
-              <li>Số lượng: {feedback.count || 0}</li>
-              <li>Điểm TB: {avgRating || "—"}</li>
+              <li>Count: {feedback.count || 0}</li>
+              <li>Avg Rating: {avgRating || "—"}</li>
             </ul>
             <div className="rating-dist">
               {[1,2,3,4,5].map(r => {
@@ -119,8 +119,8 @@ export default function GenerateReport({ profile }) {
             </div>
           </div>
           <div className="report-card" style={{ gridColumn: "1 / -1" }}>
-            <h4>Top Tutor (đã hoàn thành)</h4>
-            {tutors.length === 0 && <p className="empty-info">Không có dữ liệu tutor.</p>}
+            <h4>Top Coaches (Completed Sessions)</h4>
+            {tutors.length === 0 && <p className="empty-info">No coach data available.</p>}
             <div className="tutor-rank-list">
               {tutors.slice(0, 8).map(t => (
                 <div key={t.id} className="tutor-rank-item">
