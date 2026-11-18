@@ -29,7 +29,7 @@ export default function Dashboard() {
   const currentSection = allowed.includes(pathSeg) ? pathSeg : null;
   // -----------------------------------------------------------------
 
-  // Chỉ gọi 1 lần khi mount
+  // Only fetch once on mount
   useEffect(() => {
     if (didFetch.current) return;
     didFetch.current = true;
@@ -45,21 +45,21 @@ export default function Dashboard() {
     fetchProfile();
   }, [navigate]);
 
-  // Nếu chưa có segment sau khi có profile -> chuyển đến mặc định
+  // If no valid segment after profile loads, redirect to default section
   useEffect(() => {
     if (!profile) return;
-    // xác định roleLower sớm để tái sử dụng
+    // Determine roleLower early for reuse
     const rl = (roleName || profile.role || "").toString().toLowerCase();
     const isTutor = rl === "tutor";
     const def = isTutor ? "availability" : "book";
 
-    // nếu section = report mà không phải admin -> chuyển về mặc định
+    // If section = report but not admin -> redirect to default
     if (currentSection === "report" && rl !== "admin") {
       navigate(`/dashboard/${def}`, { replace: true });
       return;
     }
 
-    // nếu chưa có segment hợp lệ -> chuyển đến mặc định
+    // If no valid segment -> redirect to default
     if (!currentSection) {
       if (pathSeg !== def) navigate(`/dashboard/${def}`, { replace: true });
     }
@@ -70,7 +70,7 @@ export default function Dashboard() {
     return () => document.body.classList.remove("dashboard-view");
   }, []);
 
-  // effect lấy tên role
+  // Effect to load role name
   useEffect(() => {
     if (!profile || !profile.role) return;
     const loadRoleName = async () => {
@@ -183,7 +183,7 @@ export default function Dashboard() {
         </div>
 
         <div className="dash-content-area">
-          {/* Render theo section hoặc toàn bộ dashboard vai trò */}
+          {/* Render section or full role-based dashboard */}
           {currentSection ? renderSection() : (
             roleLower === 'student' ? <StudentDashboard profile={profile}/> :
             roleLower === 'tutor' ? <TutorDashboard profile={profile}/> :

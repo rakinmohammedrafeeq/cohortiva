@@ -4,7 +4,7 @@ import { API_BASE, USERS_API } from "../config/api";
 // Create an axios instance so we can attach interceptors without affecting global axios
 const api = axios.create({ baseURL: API_BASE, headers: { "Content-Type": "application/json" } });
 
-// Public (không cần token) endpoints -> bỏ Authorization nếu có token hết hạn
+// Public endpoints (no token required) -> remove Authorization if token expired
 const PUBLIC_ENDPOINTS = [
   "users/faculties/",
   "users/majors/",
@@ -16,7 +16,7 @@ const PUBLIC_ENDPOINTS = [
 ];
 
 function isPublic(config) {
-  // config.url có thể là full URL hoặc relative; chuẩn hoá về phần sau /api/
+  // config.url may be full URL or relative; normalize to the part after /api/
   const url = (config.url || "").replace(API_BASE, "").replace(/^\//, "");
   return PUBLIC_ENDPOINTS.some((p) => url.startsWith(p));
 }
@@ -57,15 +57,15 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Nếu là endpoint công khai và có Authorization thì thử 1 lần bỏ header rồi gửi lại
+    // If it's a public endpoint with Authorization, try once without header and retry
     if (isPublic(originalRequest) && originalRequest.headers?.Authorization && !originalRequest._publicRetry) {
       originalRequest._publicRetry = true;
-      // Bỏ header để backend trả về dữ liệu public
+      // Remove header to let backend return public data
       delete originalRequest.headers.Authorization;
       return api(originalRequest);
     }
 
-    // Prevent infinite loop: nếu đã retry refresh hoặc gọi chính refresh endpoint
+    // Prevent infinite loop: if already retried refresh or calling refresh endpoint itself
     if (originalRequest._retry || /token\/refresh\/$/.test(originalRequest.url || "")) {
       return Promise.reject(error);
     }
@@ -115,7 +115,7 @@ api.interceptors.response.use(
       localStorage.removeItem("refresh");
       isRefreshing = false;
       onRefreshed(null);
-      // Nếu request gốc là public -> gửi lại không header để lấy dữ liệu công khai
+      // If original request is public -> retry without header to get public data
       if (isPublic(originalRequest) && originalRequest.headers?.Authorization) {
         delete originalRequest.headers.Authorization;
         return api(originalRequest);
@@ -227,14 +227,14 @@ const updateMyTutor = async (patch) => {
 };
 
 const seedTutorAvailability = async () => {
-  // Mẫu availability đơn giản
+  // Simple availability sample
   const sample = {
     monday: ["08:00-10:00", "14:00-16:00"],
     wednesday: ["09:00-11:00"],
     friday: ["13:30-15:00"],
     online_only: true
   };
-  // PATCH vào /tutoring/tutors/me/
+  // PATCH to /tutoring/tutors/me/
   const res = await api.patch("tutoring/tutors/me/", { availability: sample });
   return res.data;
 };
@@ -280,10 +280,10 @@ const getReportOverview = async (params = {}) => {
 };
 
 // USAGE (tutor):
-// 1) login(username,password) -> lưu token
-// 2) getMyTutor() -> lấy thông tin Tutor + availability (yêu cầu đã có Tutor record hoặc BE tự tạo)
-// 3) updateMyTutor({ availability: {...} }) -> PATCH lịch rảnh
-// 4) seedTutorAvailability() -> ghi đè availability mẫu
+// 1) login(username,password) -> save token
+// 2) getMyTutor() -> fetch Tutor info + availability (requires existing Tutor record or BE auto-creates)
+// 3) updateMyTutor({ availability: {...} }) -> PATCH availability schedule
+// 4) seedTutorAvailability() -> overwrite with sample availability
 
 export default {
   registerStudent,

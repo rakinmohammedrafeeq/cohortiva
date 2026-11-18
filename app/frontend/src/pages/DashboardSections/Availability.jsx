@@ -12,7 +12,7 @@ const DAYS = [
 ];
 
 export default function Availability({ profile, roleName }) {
-  // phân biệt vai trò bằng roleName từ Dashboard (tránh lỗi id số)
+  // Distinguish role using roleName from Dashboard (avoid numeric id errors)
   const isTutor = (roleName || "").toString().toLowerCase() === "tutor";
 
   const [loading, setLoading] = useState(true);

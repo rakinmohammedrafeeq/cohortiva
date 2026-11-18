@@ -4,14 +4,14 @@ import "../styles.css";
 export default function ThemeToggle() {
   const [darkMode, setDarkMode] = useState(false);
 
-  // Load trạng thái dark mode khi mở trang
+  // Load dark mode state on page load
   useEffect(() => {
     const saved = localStorage.getItem("darkMode") === "true";
     setDarkMode(saved);
     document.body.classList.toggle("dark-mode", saved);
   }, []);
 
-  // Cập nhật body + lưu vào localStorage khi đổi mode
+  // Update body + save to localStorage when mode changes
   useEffect(() => {
     document.body.classList.toggle("dark-mode", darkMode);
     localStorage.setItem("darkMode", darkMode);

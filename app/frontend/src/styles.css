@@ -773,7 +773,7 @@ body {
     transform: translateY(0);
   }
 }
-/* Nút dark mode chung */
+/* Common dark mode toggle button */
 .theme-toggle-global {
   position: fixed;
   top: 1rem;
@@ -1312,7 +1312,7 @@ body.dark-mode .readonly-tutor-card { background:#242526; border-color:#383a3d; 
 .readonly-tutor-card h3 { margin:0 0 .4rem; font-size:.9rem; }
 .empty-info { font-size:.75rem; color:#607D8B; }
 body.dark-mode .empty-info { color:#90a4ae; }
-/* Thanh hành động trong panel availability */
+/* Action toolbar in availability panel */
 .avail-actions {
   display:flex;
   gap:.6rem;
@@ -1352,7 +1352,7 @@ body.dark-mode .avail-actions .mini-btn.seed:hover {
 body.dark-mode .booking-form label { color:#bbdefb; }
 .booking-actions { grid-column:1/-1; display:flex; justify-content:flex-end; }
 .booking-form .inline-input, .booking-form .inline-select { margin-top:.35rem; }
-/* Thêm style danh sách phiên + nút hủy. */
+/* Session list style + cancel button */
 .cancel-panel { display:flex; flex-direction:column; gap:.8rem; }
 .session-list { display:flex; flex-direction:column; gap:.65rem; }
 .session-item {
@@ -1387,7 +1387,7 @@ body.dark-mode .session-meta { color:#b0bec5; }
 .mini-cancel-btn:hover, .mini-refresh-btn:hover { background:#c62828; }
 .mini-refresh-btn { background:#1a90f8; margin-left:.5rem; }
 .mini-refresh-btn:hover { background:#0d6ecd; }
-/* Đánh giá */
+/* Evaluation/Feedback section */
 .evaluate-panel { display:flex; flex-direction:column; gap:.9rem; }
 .evaluate-list { display:flex; flex-direction:column; gap:.75rem; }
 .evaluate-item {

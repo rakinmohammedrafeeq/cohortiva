@@ -78,7 +78,7 @@ export default function BookMeeting({ profile }) {
       const endISO = new Date(date + "T" + endTimeRaw + ":00").toISOString();
       const payload = {
         tutor: selectedTutor,
-        // student: BE sẽ tự gán (student read_only theo serializer)
+        // student: BE will auto-assign (student read_only in serializer)
         start_time: startISO,
         end_time: endISO,
         mode,
