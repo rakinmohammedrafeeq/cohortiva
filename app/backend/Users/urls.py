@@ -16,7 +16,12 @@ Including another URLconf
 """
 from django.urls import path
 from rest_framework.routers import DefaultRouter
-from .views import ProfileViewSet, RegisterStudentAPIView, FacultyViewSet, MajorViewSet, RoleViewSet
+from .views import (
+    ProfileViewSet, RegisterStudentAPIView, FacultyViewSet, 
+    MajorViewSet, RoleViewSet,
+    verify_email, resend_verification_email,
+    password_reset_request, password_reset_validate, password_reset_confirm
+)
 
 router = DefaultRouter()
 router.register(r'profiles', ProfileViewSet)
@@ -26,4 +31,11 @@ router.register(r'roles', RoleViewSet, basename='roles')
 
 urlpatterns = list(router.urls) + [
     path('register/student/', RegisterStudentAPIView.as_view(), name='register-student'),
+    # Email verification
+    path('verify-email/', verify_email, name='verify-email'),
+    path('resend-verification/', resend_verification_email, name='resend-verification'),
+    # Password reset
+    path('password-reset/request/', password_reset_request, name='password-reset-request'),
+    path('password-reset/validate/', password_reset_validate, name='password-reset-validate'),
+    path('password-reset/confirm/', password_reset_confirm, name='password-reset-confirm'),
 ]

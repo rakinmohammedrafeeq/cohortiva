@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "django_filters",
+    "anymail",
 
     "Users",
     "Tutoring",
@@ -166,3 +167,16 @@ if FRONTEND_URL:
     CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)
 
 CORS_ALLOW_CREDENTIALS = True
+
+# Email configuration (Resend via django-anymail)
+EMAIL_BACKEND = 'anymail.backends.resend.EmailBackend'
+
+ANYMAIL = {
+    "RESEND_API_KEY": os.getenv('RESEND_API_KEY'),
+}
+
+# Email sender configuration
+RESEND_FROM_NAME = os.getenv('RESEND_FROM_NAME', 'Cohortiva')
+RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', 'no-reply@alliedge.app')
+RESEND_REPLY_TO_EMAIL = os.getenv('RESEND_REPLY_TO_EMAIL', 'support@alliedge.app')
+DEFAULT_FROM_EMAIL = f"{RESEND_FROM_NAME} <{RESEND_FROM_EMAIL}>"

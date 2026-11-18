@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import Profile, Faculty, Major, Role
 
 class FacultySerializer(serializers.ModelSerializer):
@@ -148,7 +150,32 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         profile = getattr(user, "profile", None)
         if profile is not None:
             data["profile_id"] = profile.id
+            data["email_verified"] = profile.email_verified
             if profile.role:
                 data["role"] = profile.role.name
 
         return data
+
+# Password Reset Serializers
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetValidateSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    
+    def validate_new_password(self, value):
+        '''Validate password against Django password validators.'''
+        try:
+            validate_password(value)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(list(e.messages))
+        return value

@@ -1,5 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
+import secrets
+from django.utils import timezone
+from datetime import timedelta
 
 class Faculty(models.Model):
     id = models.BigAutoField(primary_key=True)
@@ -30,6 +33,38 @@ class Profile(models.Model):
     major = models.ForeignKey(Major, on_delete=models.SET_NULL, blank=True, null=True)
     student_id = models.CharField(max_length=50, blank=True, null=True, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Email verification fields
+    email_verified = models.BooleanField(default=False)
+    email_verification_token = models.CharField(max_length=64, blank=True, null=True, unique=True)
+    email_verification_sent_at = models.DateTimeField(blank=True, null=True)
+    
+    def generate_verification_token(self):
+        """Generate a secure random token for email verification."""
+        self.email_verification_token = secrets.token_urlsafe(32)
+        self.email_verification_sent_at = timezone.now()
+        self.save()
+        return self.email_verification_token
+    
+    def is_verification_token_valid(self, token):
+        """Check if verification token is valid and not expired."""
+        if not self.email_verification_token or self.email_verification_token != token:
+            return False
+        if not self.email_verification_sent_at:
+            return False
+        # Token expires after 24 hours
+        expiry_time = self.email_verification_sent_at + timedelta(hours=24)
+        return timezone.now() < expiry_time
+    
+    def verify_email(self, token):
+        """Verify email with token."""
+        if self.is_verification_token_valid(token):
+            self.email_verified = True
+            self.email_verification_token = None  # One-time use
+            self.email_verification_sent_at = None
+            self.save()
+            return True
+        return False
 
     def __str__(self):
         sid = f" - {self.student_id}" if self.student_id else ""
