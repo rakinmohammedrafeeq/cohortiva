@@ -1,70 +1,101 @@
 // src/pages/LoginPage.jsx
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import authService from "../services/authService";
+import PasswordInput from "../components/PasswordInput";
+import Button from "../components/Button";
+import Alert from "../components/Alert";
 import "../styles.css";
 
 export default function LoginPage() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const handleChange = (e) =>
+  const [loading, setLoading] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(true);
+
+  const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+    if (error) setError("");
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!form.username.trim() || !form.password) {
+      setError("Please enter both username and password");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
     try {
-      await authService.login(form.username, form.password);
-      alert("Login successful!");
-      window.location.href = "/dashboard";
+      const response = await authService.login(form.username, form.password);
+      
+      // Check email_verified status
+      if (response.email_verified === false) {
+        setEmailVerified(false);
+      }
+      
+      // Proceed to dashboard
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, emailVerified ? 0 : 1500);
     } catch (err) {
       setError("Invalid username or password");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="auth-container">
-      <h2 className="auth-title">Login</h2>
-      {error && <p className="auth-message error">{error}</p>}
+    <div className="auth-container">
+      <h2 className="auth-title">Welcome Back</h2>
 
-      <input
-        type="text"
-        name="username"
-        placeholder="Username"
-        value={form.username}
-        onChange={handleChange}
-        className="auth-input"
-      />
+      {!emailVerified && (
+        <Alert type="warning">
+          Your email is not verified. Please check your inbox and verify your email.
+        </Alert>
+      )}
 
-      <input
-        type={showPassword ? "text" : "password"}
-        name="password"
-        placeholder="Password"
-        value={form.password}
-        onChange={handleChange}
-        className="auth-input"
-      />
-      <label className="show-password-label">
-        <input
-          type="checkbox"
-          name="showPassword"
-          placeholder="showPassword"
-          className="auth-input-checkbox"
-          onChange={(e) => setShowPassword(e.target.checked)}
-        />
-        Show password
-      </label>
-      <div className="auth-extra">
-        <Link to="/forgot-password">Forgot Password?</Link>
-      </div>
+      {error && <Alert type="error">{error}</Alert>}
 
-      <button type="submit" className="auth-button">
-        Login
-      </button>
+      <form onSubmit={handleSubmit}>
+        <div className="form-field">
+          <input
+            type="text"
+            name="username"
+            placeholder="Username"
+            value={form.username}
+            onChange={handleChange}
+            className="auth-input"
+            autoComplete="username"
+          />
+        </div>
+
+        <div className="form-field">
+          <PasswordInput
+            name="password"
+            placeholder="Password"
+            value={form.password}
+            onChange={handleChange}
+            autoComplete="current-password"
+          />
+        </div>
+
+        <div className="auth-extra">
+          <Link to="/forgot-password">Forgot Password?</Link>
+        </div>
+
+        <Button type="submit" loading={loading}>
+          Login
+        </Button>
+      </form>
 
       <p className="auth-link">
-        Don’t have an account? <Link to="/register">Register</Link>
+        Don't have an account? <Link to="/register">Register</Link>
       </p>
-    </form>
+    </div>
   );
 }

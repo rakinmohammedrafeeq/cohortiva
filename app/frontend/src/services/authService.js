@@ -135,6 +135,31 @@ const login = async (username, password) => {
   const res = await axios.post(API_BASE + "token/", { username, password });
   localStorage.setItem("access", res.data.access);
   localStorage.setItem("refresh", res.data.refresh);
+  return res.data; // Returns { access, refresh, email_verified }
+};
+
+const verifyEmail = async (token) => {
+  const res = await axios.post(USERS_API + "verify-email/", { token });
+  return res.data;
+};
+
+const resendVerification = async () => {
+  const res = await api.post(USERS_API + "resend-verification/");
+  return res.data;
+};
+
+const requestPasswordReset = async (email) => {
+  const res = await axios.post(USERS_API + "password-reset/request/", { email });
+  return res.data;
+};
+
+const validateResetToken = async (uid, token) => {
+  const res = await axios.post(USERS_API + "password-reset/validate/", { uid, token });
+  return res.data;
+};
+
+const confirmPasswordReset = async (uid, token, new_password) => {
+  const res = await axios.post(USERS_API + "password-reset/confirm/", { uid, token, new_password });
   return res.data;
 };
 
@@ -253,6 +278,11 @@ const getReportOverview = async (params = {}) => {
 export default {
   registerStudent,
   login,
+  verifyEmail,
+  resendVerification,
+  requestPasswordReset,
+  validateResetToken,
+  confirmPasswordReset,
   getProfile,
   refreshToken,
   getFaculties,
