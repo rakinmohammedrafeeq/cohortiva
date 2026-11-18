@@ -11,8 +11,7 @@ docopt==0.6.2
 gunicorn==21.2.0
 idna==3.11
 pipreqs==0.4.13
-psycopg==3.2.12
-psycopg-binary==3.3.9
+psycopg[binary]==3.3.9
 PyJWT==2.10.1
 python-dotenv==1.1.1
 requests==2.32.5
