@@ -60,8 +60,35 @@ class RegisterSerializer(serializers.Serializer):
             if Profile.objects.filter(student_id=value).exists():
                 raise serializers.ValidationError("A profile with that student ID already exists.")
         return value
+    
+    def validate_password(self, value):
+        '''Validate password against Django password validators.'''
+        try:
+            validate_password(value)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(list(e.messages))
+        return value
 
     def validate(self, attrs):
+        # Additional validation: password similarity to username/email
+        password = attrs.get('password')
+        username = attrs.get('username')
+        email = attrs.get('email')
+        
+        if password and username:
+            from django.contrib.auth.models import User
+            # Create a temporary user instance for validation (not saved)
+            temp_user = User(
+                username=username,
+                email=email or '',
+                first_name=attrs.get('first_name', ''),
+                last_name=attrs.get('last_name', '')
+            )
+            try:
+                validate_password(password, user=temp_user)
+            except DjangoValidationError as e:
+                raise serializers.ValidationError({'password': list(e.messages)})
+        
         sid = attrs.get('student_id')
         role = attrs.get('role')
 

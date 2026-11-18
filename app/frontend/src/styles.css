@@ -84,6 +84,13 @@ body {
   margin-bottom: 0;
 }
 
+.form-hint {
+  font-size: 0.8rem;
+  color: #64748B;
+  margin-top: 0.35rem;
+  margin-bottom: 0;
+}
+
 /* Inputs */
 .auth-input {
   display: block;

@@ -21,8 +21,8 @@ export default function ForgotPassword() {
       return;
     }
 
-    if (!/^[^\s@]+@hcmut\.edu\.vn$/.test(email)) {
-      setError("Please enter a valid @hcmut.edu.vn email");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("Please enter a valid email address");
       return;
     }
 
@@ -51,7 +51,7 @@ export default function ForgotPassword() {
         <div className="form-field">
           <input
             type="email"
-            placeholder="Email (@hcmut.edu.vn)"
+            placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className={`auth-input ${error ? 'input-error' : ''}`}

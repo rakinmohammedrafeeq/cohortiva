@@ -38,17 +38,26 @@ export default function RegisterPage() {
       setErrors({ ...errors, [e.target.name]: null });
     }
 
-    // Password strength indicator
+    // Password strength indicator (separate from validation)
     if (e.target.name === "password") {
       const pwd = value;
       if (pwd.length === 0) {
         setPasswordStrength("");
-      } else if (pwd.length < 8) {
-        setPasswordStrength("weak");
-      } else if (/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/.test(pwd)) {
-        setPasswordStrength("strong");
       } else {
-        setPasswordStrength("medium");
+        let strength = 0;
+        if (pwd.length >= 8) strength++;
+        if (pwd.length >= 12) strength++;
+        if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) strength++;
+        if (/\d/.test(pwd)) strength++;
+        if (/[^a-zA-Z0-9]/.test(pwd)) strength++;
+        
+        if (strength <= 2) {
+          setPasswordStrength("weak");
+        } else if (strength <= 3) {
+          setPasswordStrength("medium");
+        } else {
+          setPasswordStrength("strong");
+        }
       }
     }
   };
@@ -64,14 +73,20 @@ export default function RegisterPage() {
 
     if (!form.email.trim()) {
       newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@hcmut\.edu\.vn$/.test(form.email)) {
-      newErrors.email = "Must be a valid @hcmut.edu.vn email";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      newErrors.email = "Must be a valid email address";
     }
 
     if (!form.password) {
       newErrors.password = "Password is required";
-    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/.test(form.password)) {
-      newErrors.password = "8+ characters with uppercase, lowercase, and number";
+    } else if (form.password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters";
+    } else if (/^\d+$/.test(form.password)) {
+      newErrors.password = "Password cannot be entirely numeric";
+    } else if (form.username && form.password.toLowerCase().includes(form.username.toLowerCase())) {
+      newErrors.password = "Password is too similar to your username";
+    } else if (form.email && form.password.toLowerCase().includes(form.email.split('@')[0].toLowerCase())) {
+      newErrors.password = "Password is too similar to your email";
     }
 
     if (form.password !== form.confirm_password) {
@@ -217,7 +232,7 @@ export default function RegisterPage() {
             <input
               type="email"
               name="email"
-              placeholder="Email (@hcmut.edu.vn)"
+              placeholder="Email"
               value={form.email}
               onChange={handleChange}
               className={`auth-input ${errors.email ? 'input-error' : ''}`}
@@ -235,6 +250,7 @@ export default function RegisterPage() {
               error={errors.password}
               autoComplete="new-password"
             />
+            <p className="form-hint">At least 8 characters. Avoid common passwords and personal information.</p>
             {passwordStrength && (
               <div className={`password-strength strength-${passwordStrength}`}>
                 {passwordStrength === "weak" && "Weak"}

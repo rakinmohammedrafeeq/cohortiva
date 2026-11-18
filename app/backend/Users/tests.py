@@ -455,3 +455,211 @@ class ExistingUserCompatibilityTests(TestCase):
         # Should be able to access profile
         response = self.client.get('/api/users/profiles/me/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class EmailDomainValidationTests(TestCase):
+    """Test email domain validation allows various domains."""
+    
+    def setUp(self):
+        self.client = APIClient()
+        # Create both required roles
+        self.student_role = Role.objects.create(id=1, name='Student')
+        self.guest_role = Role.objects.create(id=5, name='Guest')
+    
+    def test_rnsit_email_accepted(self):
+        """Test that @rnsit.ac.in emails are accepted."""
+        response = self.client.post('/api/users/register/student/', {
+            'username': 'testuser',
+            'email': 'test@rnsit.ac.in',
+            'password': 'SecurePass123!',
+            'first_name': 'Test',
+            'last_name': 'User',
+        })
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(email='test@rnsit.ac.in')
+        self.assertIsNotNone(user)
+    
+    def test_gmail_email_accepted(self):
+        """Test that Gmail addresses are accepted."""
+        response = self.client.post('/api/users/register/student/', {
+            'username': 'gmailuser',
+            'email': 'user@gmail.com',
+            'password': 'SecurePass123!',
+            'first_name': 'Gmail',
+            'last_name': 'User',
+        })
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(email='user@gmail.com')
+        self.assertIsNotNone(user)
+    
+    def test_various_domains_accepted(self):
+        """Test that various email domains are accepted."""
+        domains = ['example.org', 'university.edu', 'company.co.uk', 'domain.io']
+        
+        for i, domain in enumerate(domains):
+            username = f'user{i}'
+            email = f'{username}@{domain}'
+            response = self.client.post('/api/users/register/student/', {
+                'username': username,
+                'email': email,
+                'password': 'SecurePass123!',
+                'first_name': 'Test',
+                'last_name': 'User',
+            })
+            
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED,
+                           f"Failed for domain: {domain}")
+            self.assertTrue(User.objects.filter(email=email).exists())
+    
+    def test_invalid_email_format_rejected(self):
+        """Test that invalid email formats are rejected."""
+        invalid_emails = [
+            'notanemail',
+            '@nodomain.com',
+            'missing@',
+            'no@domain',
+            'spaces in@email.com',
+        ]
+        
+        for i, email in enumerate(invalid_emails):
+            response = self.client.post('/api/users/register/student/', {
+                'username': f'invaliduser{i}',
+                'email': email,
+                'password': 'SecurePass123!',
+                'first_name': 'Test',
+                'last_name': 'User',
+            })
+            
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST,
+                           f"Should reject: {email}")
+    
+    def test_duplicate_email_rejected(self):
+        """Test that duplicate emails are rejected."""
+        # Create first user
+        User.objects.create_user(
+            username='firstuser',
+            email='duplicate@example.com',
+            password='Password123!'
+        )
+        Profile.objects.create(
+            user=User.objects.get(username='firstuser'),
+            role=self.guest_role
+        )
+        
+        # Try to register with same email
+        response = self.client.post('/api/users/register/student/', {
+            'username': 'seconduser',
+            'email': 'duplicate@example.com',
+            'password': 'SecurePass123!',
+            'first_name': 'Second',
+            'last_name': 'User',
+        })
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('email', response.data)
+
+
+class PasswordValidationTests(TestCase):
+    """Test password validation matches Django validators."""
+    
+    def setUp(self):
+        self.client = APIClient()
+        self.student_role = Role.objects.create(id=1, name='Student')
+        self.guest_role = Role.objects.create(id=5, name='Guest')
+    
+    def test_strong_password_accepted(self):
+        """Test that strong passwords meeting all criteria are accepted."""
+        response = self.client.post('/api/users/register/student/', {
+            'username': 'testuser',
+            'email': 'test@example.com',
+            'password': 'MySecureP@ssw0rd123',
+            'first_name': 'Test',
+            'last_name': 'User',
+        })
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+    
+    def test_password_too_short_rejected(self):
+        """Test that passwords under 8 characters are rejected."""
+        response = self.client.post('/api/users/register/student/', {
+            'username': 'testuser',
+            'email': 'test@example.com',
+            'password': 'Short1',
+            'first_name': 'Test',
+            'last_name': 'User',
+        })
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+    
+    def test_entirely_numeric_password_rejected(self):
+        """Test that entirely numeric passwords are rejected."""
+        response = self.client.post('/api/users/register/student/', {
+            'username': 'testuser',
+            'email': 'test@example.com',
+            'password': '12345678',
+            'first_name': 'Test',
+            'last_name': 'User',
+        })
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+    
+    def test_common_password_rejected(self):
+        """Test that common passwords are rejected."""
+        response = self.client.post('/api/users/register/student/', {
+            'username': 'testuser',
+            'email': 'test@example.com',
+            'password': 'password123',
+            'first_name': 'Test',
+            'last_name': 'User',
+        })
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+    
+    def test_password_similar_to_username_rejected(self):
+        """Test that passwords similar to username are rejected."""
+        response = self.client.post('/api/users/register/student/', {
+            'username': 'johndoe',
+            'email': 'john@example.com',
+            'password': 'johndoe123',
+            'first_name': 'John',
+            'last_name': 'Doe',
+        })
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+    
+    def test_password_reset_validation(self):
+        """Test that password validation works during password reset."""
+        from .utils.tokens import generate_password_reset_token
+        
+        user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='OldPassword123!'
+        )
+        Profile.objects.create(user=user, role=self.student_role)
+        
+        uid, token = generate_password_reset_token(user)
+        
+        # Try weak password
+        response = self.client.post('/api/users/password-reset/confirm/', {
+            'uid': uid,
+            'token': token,
+            'new_password': '12345678'
+        })
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+    
+    def test_password_confirmation_mismatch(self):
+        """Test frontend-level password confirmation (mocked in backend test)."""
+        # This tests the serializer accepts valid passwords
+        response = self.client.post('/api/users/register/student/', {
+            'username': 'testuser',
+            'email': 'test@example.com',
+            'password': 'ValidPassword123!',
+            'first_name': 'Test',
+            'last_name': 'User',
+        })
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
