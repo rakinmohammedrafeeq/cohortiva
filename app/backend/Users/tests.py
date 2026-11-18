@@ -342,26 +342,122 @@ class EmailDeliveryFailureTests(TestCase):
     
     @patch('Users.utils.email.send_html_email')
     def test_resend_verification_reports_failure(self, mock_send_html_email):
-        """Test that resend verification properly reports email failure."""
+        """Public resend endpoint returns 503 when email delivery fails."""
         user = User.objects.create_user(
             username='testuser',
             email='test@example.com',
             password='Password123!'
         )
-        profile = Profile.objects.create(user=user, role=self.student_role)
-        
-        # Simulate email failure
+        Profile.objects.create(user=user, role=self.student_role)
+
+        # Simulate email delivery failure
         mock_send_html_email.return_value = False
-        
-        # Login
-        self.client.force_authenticate(user=user)
-        
-        response = self.client.post('/api/users/resend-verification/')
-        
+
+        # Public endpoint - no authentication required
+        response = self.client.post('/api/users/resend-verification/', {
+            'email': 'test@example.com'
+        })
+
         # Should report service unavailable
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertIn('try again later', response.data['detail'].lower())
 
+
+class ResendVerificationTests(TestCase):
+    """Tests for the public email-based resend-verification endpoint."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.student_role = Role.objects.create(name='Student')
+        self.user = User.objects.create_user(
+            username='verifyuser',
+            email='verify@example.com',
+            password='Password123!'
+        )
+        self.profile = Profile.objects.create(user=self.user, role=self.student_role)
+
+    @patch('Users.utils.email.send_html_email')
+    def test_resend_no_auth_required(self, mock_email):
+        """Endpoint is fully public - no JWT needed."""
+        mock_email.return_value = True
+        response = self.client.post('/api/users/resend-verification/', {
+            'email': 'verify@example.com'
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @patch('Users.utils.email.send_html_email')
+    def test_resend_missing_email_returns_400(self, mock_email):
+        """Missing email body field returns 400."""
+        mock_email.return_value = True
+        response = self.client.post('/api/users/resend-verification/', {})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('Users.utils.email.send_html_email')
+    def test_resend_unknown_email_returns_generic_200(self, mock_email):
+        """Unknown email returns generic 200 to prevent enumeration."""
+        mock_email.return_value = True
+        response = self.client.post('/api/users/resend-verification/', {
+            'email': 'nobody@nowhere.example'
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('unverified account', response.data['detail'].lower())
+
+    @patch('Users.utils.email.send_html_email')
+    def test_resend_already_verified_returns_generic_200(self, mock_email):
+        """Already-verified accounts silently return generic 200."""
+        mock_email.return_value = True
+        self.profile.email_verified = True
+        self.profile.save()
+        response = self.client.post('/api/users/resend-verification/', {
+            'email': 'verify@example.com'
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Must NOT send an email
+        mock_email.assert_not_called()
+
+    @patch('Users.utils.email.send_html_email')
+    def test_resend_cooldown_enforced(self, mock_email):
+        """Second request within 1 minute returns 429 with retry_after."""
+        mock_email.return_value = True
+        # First send
+        self.client.post('/api/users/resend-verification/', {
+            'email': 'verify@example.com'
+        })
+        # Immediate second send
+        response = self.client.post('/api/users/resend-verification/', {
+            'email': 'verify@example.com'
+        })
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertIn('retry_after', response.data)
+
+    @patch('Users.utils.email.send_html_email')
+    def test_resend_invalidates_previous_token(self, mock_email):
+        """A new resend issues a fresh token; old token no longer verifies."""
+        mock_email.return_value = True
+        old_token = self.profile.generate_verification_token()
+
+        # Advance clock past cooldown
+        self.profile.email_verification_sent_at = timezone.now() - timedelta(minutes=2)
+        self.profile.save()
+
+        # Request a new token
+        self.client.post('/api/users/resend-verification/', {
+            'email': 'verify@example.com'
+        })
+
+        # Old token must be rejected
+        response = self.client.post('/api/users/verify-email/', {'token': old_token})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('Users.utils.email.send_html_email')
+    def test_resend_delivery_failure_returns_503(self, mock_email):
+        """Delivery failure returns 503 (not 200) so the UI can distinguish."""
+        mock_email.return_value = False
+        response = self.client.post('/api/users/resend-verification/', {
+            'email': 'verify@example.com'
+        })
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(response.data.get('email_status'), 'failed')
 
 class EmailVerificationSecurityTests(TestCase):
     """Test email verification token security."""

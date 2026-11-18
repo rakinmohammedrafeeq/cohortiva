@@ -259,52 +259,82 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 # Email Verification Views
 
+import logging as _logging
+_logger = _logging.getLogger(__name__)
+
+
+@ratelimit(key='ip', rate='10/h', method='POST', block=True)
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def resend_verification_email(request):
-    '''Resend verification email with rate limiting.'''
-    profile = request.user.profile
-    
-    # Check if already verified
-    if profile.email_verified:
+    '''
+    Public endpoint: resend verification email by email address.
+
+    Accepts { "email": "<address>" }.
+    - Works for unauthenticated newly-registered users (no JWT required).
+    - Never reveals whether an email address has an account (anti-enumeration).
+    - Enforces a 1-minute per-account cooldown.
+    - Rate-limited by IP (10 requests/hour via django-ratelimit).
+    - Invalidates the previous token and issues a fresh one.
+    - Returns HTTP 200 with a generic message regardless of outcome.
+    '''
+    email = (request.data.get('email') or '').strip().lower()
+
+    if not email:
         return Response(
-            {'detail': 'Email already verified.'},
+            {'detail': 'Email address is required.'},
             status=status.HTTP_400_BAD_REQUEST
         )
-    
-    # Rate limiting: 1 email per minute
-    if profile.email_verification_sent_at:
-        time_since_last = timezone.now() - profile.email_verification_sent_at
-        if time_since_last < timedelta(minutes=1):
-            seconds_remaining = int((timedelta(minutes=1) - time_since_last).total_seconds())
-            return Response(
-                {'detail': f'Please wait {seconds_remaining} seconds before requesting another email.'},
-                status=status.HTTP_429_TOO_MANY_REQUESTS
-            )
-    
-    # Generate new token and attempt to send email
-    token = profile.generate_verification_token()
-    email_sent = False
-    
+
+    # Generic response used for all outcomes to prevent enumeration
+    GENERIC_OK = {'detail': 'If an unverified account exists for that email, a new verification link has been sent.'}
+
     try:
-        email_sent = send_verification_email(request.user, token)
-    except Exception as e:
-        # Log error but don't expose details to user
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Failed to resend verification email for {request.user.email}: {e}")
-    
-    if email_sent:
-        return Response(
-            {'detail': 'Verification email sent.'},
-            status=status.HTTP_200_OK
-        )
-    else:
-        # Token was generated but email failed - user can try again after rate limit
-        return Response(
-            {'detail': 'Could not send verification email at this time. Please try again later.'},
-            status=status.HTTP_503_SERVICE_UNAVAILABLE
-        )
+        user = User.objects.get(email__iexact=email)
+        profile = getattr(user, 'profile', None)
+
+        # Silently succeed for unknown emails or already-verified accounts
+        if profile is None or profile.email_verified:
+            return Response(GENERIC_OK, status=status.HTTP_200_OK)
+
+        # Per-account cooldown: 1 email per minute
+        if profile.email_verification_sent_at:
+            time_since_last = timezone.now() - profile.email_verification_sent_at
+            if time_since_last < timedelta(minutes=1):
+                seconds_remaining = int(
+                    (timedelta(minutes=1) - time_since_last).total_seconds()
+                )
+                return Response(
+                    {'detail': f'Please wait {seconds_remaining} seconds before requesting another email.',
+                     'retry_after': seconds_remaining},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+
+        # Generate a fresh token (invalidates previous token automatically)
+        token = profile.generate_verification_token()
+        email_sent = False
+
+        try:
+            email_sent = send_verification_email(user, token)
+        except Exception as exc:
+            _logger.error(
+                f"Failed to send verification email for {user.email}: {exc}",
+                exc_info=True
+            )
+
+        if not email_sent:
+            # Token is generated but delivery failed; report so the UI can distinguish
+            return Response(
+                {'detail': 'Could not send verification email at this time. Please try again later.',
+                 'email_status': 'failed'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+    except User.DoesNotExist:
+        # Do not reveal that the email address has no account
+        pass
+
+    return Response(GENERIC_OK, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])

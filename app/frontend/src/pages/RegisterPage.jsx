@@ -289,7 +289,7 @@ export default function RegisterPage({ initialRole }) {
       };
 
       await authService.registerStudent(payload);
-      navigate("/verification-sent");
+      navigate("/verification-sent", { state: { email: learnerForm.email.trim() } });
     } catch (err) {
       const resp = err?.response?.data;
       if (resp && typeof resp === "object") {

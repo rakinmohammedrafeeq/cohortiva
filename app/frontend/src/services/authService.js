@@ -11,6 +11,8 @@ const PUBLIC_ENDPOINTS = [
   "users/roles/",
   "users/register/student/",
   "users/apply-coach/",
+  "users/resend-verification/",
+  "users/verify-email/",
 ];
 
 function isPublic(config) {
@@ -149,8 +151,10 @@ const verifyEmail = async (token) => {
   return res.data;
 };
 
-const resendVerification = async () => {
-  const res = await api.post(USERS_API + "resend-verification/");
+const resendVerification = async (email) => {
+  // Public endpoint — accepts email, no JWT required.
+  // Uses plain axios to guarantee no Authorization header is attached.
+  const res = await axios.post(USERS_API + "resend-verification/", { email });
   return res.data;
 };
 

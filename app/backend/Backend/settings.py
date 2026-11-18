@@ -169,9 +169,10 @@ VERCEL_URL = os.getenv("VERCEL_URL")
 if VERCEL_URL:
     CORS_ALLOWED_ORIGINS.append(f"https://{VERCEL_URL}")
 
-FRONTEND_URL = os.getenv("FRONTEND_URL")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://cohortiva.vercel.app")
 if FRONTEND_URL:
-    CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)
+    if FRONTEND_URL not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)
     # Security: Validate FRONTEND_URL in production
     if not DEBUG and not FRONTEND_URL.startswith('https://'):
         import warnings
