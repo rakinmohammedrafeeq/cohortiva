@@ -63,28 +63,25 @@ export default function VerificationSentPage() {
       setShowEmailInput(false);
 
       setResendStatus(STATUS_SENT);
-      setMessage(data?.detail || "Verification email sent! Check your inbox.");
+      setMessage(
+        data?.detail ||
+        "If an eligible account exists, a verification email will be sent. Check your inbox or try again later."
+      );
       startCooldown(60);
     } catch (err) {
       const status = err?.response?.status;
       const detail = err?.response?.data?.detail || "";
-      const retryAfter = err?.response?.data?.retry_after;
 
       if (status === 429) {
-        // Per-account cooldown reported by backend
-        const secs = retryAfter || 60;
-        setResendStatus(STATUS_COOLDOWN);
-        setMessage(detail || `Please wait ${secs} seconds before requesting another email.`);
-        startCooldown(secs);
-      } else if (status === 503) {
-        // Email delivery failed on the server
-        setResendStatus(STATUS_DELIVERY_FAILED);
-        setMessage("We could not deliver the email right now. Please try again in a moment.");
+        // IP-based rate limiting from django-ratelimit
+        setResendStatus(STATUS_ERROR);
+        setMessage("Too many requests. Please wait a few minutes and try again.");
       } else if (!err?.response) {
         // Network / CORS / timeout
         setResendStatus(STATUS_ERROR);
         setMessage("Network error — check your internet connection and try again.");
       } else {
+        // Other errors - show generic message
         setResendStatus(STATUS_ERROR);
         setMessage(detail || "Something went wrong. Please try again.");
       }
