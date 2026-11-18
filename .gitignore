@@ -77,8 +77,8 @@ dist
 # Keep original repo for reference
 tutoring-platform/
 
-# Agent workflow artifacts
-.agents/
+# Agent workflow artifacts (root-level only)
+/.agents/
 
 # AI-generated artifacts (local only)
 .local/
