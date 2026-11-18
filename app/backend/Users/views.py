@@ -68,14 +68,34 @@ class RegisterStudentAPIView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
+        # Create user and profile
         profile = serializer.save()
         
-        # Generate verification token and send email
+        # Generate verification token and attempt to send email
         token = profile.generate_verification_token()
-        send_verification_email(profile.user, token)
+        email_sent = False
+        
+        try:
+            email_sent = send_verification_email(profile.user, token)
+        except Exception as e:
+            # Log error but don't expose details to user
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to send verification email during registration for {profile.user.email}: {e}")
         
         output = ProfileSerializer(profile, context={'request': request})
-        return Response(output.data, status=status.HTTP_201_CREATED)
+        response_data = output.data
+        
+        # Inform user about email status without exposing technical details
+        if not email_sent:
+            response_data['email_status'] = 'pending'
+            response_data['message'] = 'Registration successful. You can request a verification email from your profile.'
+        else:
+            response_data['email_status'] = 'sent'
+            response_data['message'] = 'Registration successful. Please check your email to verify your account.'
+        
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
 
 class FacultyViewSet(viewsets.ReadOnlyModelViewSet):
@@ -144,14 +164,29 @@ def resend_verification_email(request):
                 status=status.HTTP_429_TOO_MANY_REQUESTS
             )
     
-    # Generate new token and send email
+    # Generate new token and attempt to send email
     token = profile.generate_verification_token()
-    send_verification_email(request.user, token)
+    email_sent = False
     
-    return Response(
-        {'detail': 'Verification email sent.'},
-        status=status.HTTP_200_OK
-    )
+    try:
+        email_sent = send_verification_email(request.user, token)
+    except Exception as e:
+        # Log error but don't expose details to user
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to resend verification email for {request.user.email}: {e}")
+    
+    if email_sent:
+        return Response(
+            {'detail': 'Verification email sent.'},
+            status=status.HTTP_200_OK
+        )
+    else:
+        # Token was generated but email failed - user can try again after rate limit
+        return Response(
+            {'detail': 'Could not send verification email at this time. Please try again later.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
 
 
 @api_view(['POST'])
@@ -198,17 +233,28 @@ def password_reset_request(request):
     
     email = serializer.validated_data['email']
     
-    # Try to find user, but don't reveal if they exist
+    # Try to find user and send email, but don't reveal if they exist
     try:
         user = User.objects.get(email=email)
         uid, token = generate_password_reset_token(user)
         reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}"
-        send_password_reset_email(user, reset_url)
+        
+        # Attempt to send email, but log failures silently
+        try:
+            send_password_reset_email(user, reset_url)
+        except Exception as e:
+            # Log email failure without exposing to user
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to send password reset email to {email}: {e}")
+            # Continue to generic response - don't reveal email delivery failure
     except User.DoesNotExist:
         # Log attempt but don't reveal to user
-        pass
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Password reset requested for non-existent email: {email}")
     
-    # Always return success (security)
+    # Always return success (security: prevent email enumeration)
     return Response(
         {'detail': 'If an account exists with this email, a password reset link has been sent.'},
         status=status.HTTP_200_OK
@@ -256,8 +302,33 @@ def password_reset_confirm(request):
     user.set_password(new_password)
     user.save()
     
-    # Send confirmation email
-    send_password_changed_email(user)
+    # Update password change timestamp to invalidate existing tokens
+    profile = getattr(user, 'profile', None)
+    if profile:
+        profile.password_changed_at = timezone.now()
+        profile.save()
+    
+    # Blacklist all outstanding refresh tokens for this user
+    from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+    try:
+        outstanding_tokens = OutstandingToken.objects.filter(user=user)
+        for outstanding_token in outstanding_tokens:
+            from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
+            BlacklistedToken.objects.get_or_create(token=outstanding_token)
+    except Exception as e:
+        # Log but don't fail if blacklist is unavailable
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Could not blacklist tokens for user {user.id}: {e}")
+    
+    # Send confirmation email (but don't fail password reset if email fails)
+    try:
+        send_password_changed_email(user)
+    except Exception as e:
+        # Log email failure but password reset still succeeded
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to send password change notification to {user.email}: {e}")
     
     return Response(
         {'detail': 'Password reset successfully.'},

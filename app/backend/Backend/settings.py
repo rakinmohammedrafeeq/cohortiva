@@ -51,6 +51,7 @@ INSTALLED_APPS = [
 
     "corsheaders",
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "django_filters",
     "anymail",
 
@@ -70,6 +71,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "Users.middleware.SecurityHeadersMiddleware",
 ]
 
 ROOT_URLCONF = "Backend.urls"
@@ -141,7 +143,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "Users.authentication.CustomJWTAuthentication",
     ),
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
 }
@@ -149,7 +151,12 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
 }
+
+# Password reset token timeout (1 hour)
+PASSWORD_RESET_TIMEOUT = 3600
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
@@ -165,6 +172,13 @@ if VERCEL_URL:
 FRONTEND_URL = os.getenv("FRONTEND_URL")
 if FRONTEND_URL:
     CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)
+    # Security: Validate FRONTEND_URL in production
+    if not DEBUG and not FRONTEND_URL.startswith('https://'):
+        import warnings
+        warnings.warn(
+            f"FRONTEND_URL should use HTTPS in production. Current: {FRONTEND_URL}",
+            RuntimeWarning
+        )
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -180,3 +194,15 @@ RESEND_FROM_NAME = os.getenv('RESEND_FROM_NAME', 'Cohortiva')
 RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', 'no-reply@alliedge.app')
 RESEND_REPLY_TO_EMAIL = os.getenv('RESEND_REPLY_TO_EMAIL', 'support@alliedge.app')
 DEFAULT_FROM_EMAIL = f"{RESEND_FROM_NAME} <{RESEND_FROM_EMAIL}>"
+
+# Security: HTTPS enforcement in production
+if not DEBUG:
+    # Render handles HTTPS redirect at edge - trust forwarded protocol header
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    # Do NOT enable SECURE_SSL_REDIRECT - Render already redirects at edge
+    # SECURE_SSL_REDIRECT = True would create redundant redirects
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True

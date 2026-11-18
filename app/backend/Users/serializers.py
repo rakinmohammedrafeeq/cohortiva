@@ -118,6 +118,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     - username, first_name, last_name
     - profile_id
     - role (tên role trong bảng Role)
+    - password_changed_at for token invalidation
     """
 
     @classmethod
@@ -133,6 +134,9 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             token["profile_id"] = profile.id
             if profile.role:
                 token["role"] = profile.role.name
+            # Add password change timestamp for token invalidation
+            if profile.password_changed_at:
+                token["pwd_changed"] = int(profile.password_changed_at.timestamp())
 
         return token
 

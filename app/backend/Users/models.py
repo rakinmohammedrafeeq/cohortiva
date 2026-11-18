@@ -39,6 +39,9 @@ class Profile(models.Model):
     email_verification_token = models.CharField(max_length=64, blank=True, null=True, unique=True)
     email_verification_sent_at = models.DateTimeField(blank=True, null=True)
     
+    # Password security fields
+    password_changed_at = models.DateTimeField(null=True, blank=True)
+    
     def generate_verification_token(self):
         """Generate a secure random token for email verification."""
         self.email_verification_token = secrets.token_urlsafe(32)
